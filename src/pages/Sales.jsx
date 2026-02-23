@@ -1,0 +1,589 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+} from "recharts";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const S = {
+  page: {
+    backgroundColor: "#f5f6fa",
+    minHeight: "100vh",
+    fontFamily: "'DM Sans', sans-serif",
+    paddingBottom: "90px",
+  },
+  header: {
+    padding: "20px 20px 10px",
+    backgroundColor: "#f5f6fa",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+  },
+  title: { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
+  body: { padding: "0 16px", display: "flex", flexDirection: "column", gap: "14px" },
+
+  tabBar: {
+    backgroundColor: "#fff",
+    borderRadius: "14px",
+    display: "flex",
+    padding: "4px",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  tab: (active) => ({
+    flex: 1,
+    padding: "9px 0",
+    border: "none",
+    borderRadius: "10px",
+    backgroundColor: active ? "#fff" : "transparent",
+    color: active ? "#1a1a2e" : "#9ca3af",
+    fontWeight: active ? "700" : "400",
+    fontSize: "14px",
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    boxShadow: active ? "0 1px 6px rgba(0,0,0,0.1)" : "none",
+    transition: "all 0.15s ease",
+  }),
+
+  totalCard: {
+    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+    borderRadius: "18px",
+    padding: "20px",
+    color: "#fff",
+  },
+  totalLabel: { fontSize: "13px", fontWeight: "500", opacity: 0.85, marginBottom: "6px" },
+  totalAmount: { fontSize: "34px", fontWeight: "700", margin: "0 0 10px", letterSpacing: "-0.5px" },
+  totalChange: { fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", opacity: 0.9 },
+
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: "16px",
+    padding: "16px",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  cardTitle: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", margin: "0 0 14px" },
+
+  slowItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 0",
+    borderBottom: "1px solid #f3f4f6",
+  },
+  slowName: { fontSize: "14px", color: "#374151" },
+  slowStock: { fontSize: "12px", color: "#9ca3af" },
+
+  recordItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "12px 0",
+    borderBottom: "1px solid #f3f4f6",
+    cursor: "pointer",
+  },
+  recordDate: { fontSize: "15px", fontWeight: "600", color: "#1a1a2e" },
+  recordSub: { fontSize: "12px", color: "#9ca3af", marginTop: "2px" },
+  recordAmount: { fontSize: "16px", fontWeight: "700", color: "#f97316" },
+  recordRight: { display: "flex", alignItems: "center", gap: "10px" },
+  reviewChevron: { color: "#d1d5db" },
+
+  fab: {
+    position: "fixed",
+    bottom: "85px",
+    right: "20px",
+    width: "52px",
+    height: "52px",
+    borderRadius: "50%",
+    backgroundColor: "#f97316",
+    border: "none",
+    color: "#fff",
+    fontSize: "26px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 16px rgba(249,115,22,0.4)",
+    zIndex: 100,
+  },
+
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    zIndex: 200,
+    display: "flex",
+    alignItems: "flex-end",
+  },
+  modal: {
+    backgroundColor: "#fff",
+    borderRadius: "24px 24px 0 0",
+    width: "100%",
+    padding: "24px 20px 40px",
+    maxHeight: "90vh",
+    overflowY: "auto",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "6px",
+  },
+  modalTitle: { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
+  modalSub: { fontSize: "13px", color: "#9ca3af", marginBottom: "20px" },
+  closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
+  label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
+  input: {
+    width: "100%",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "10px 14px",
+    fontSize: "14px",
+    fontFamily: "'DM Sans', sans-serif",
+    color: "#1a1a2e",
+    outline: "none",
+    boxSizing: "border-box",
+    backgroundColor: "#fff",
+    marginBottom: "14px",
+  },
+  textarea: {
+    width: "100%",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "10px 14px",
+    fontSize: "14px",
+    fontFamily: "'DM Sans', sans-serif",
+    color: "#1a1a2e",
+    outline: "none",
+    boxSizing: "border-box",
+    backgroundColor: "#fff",
+    minHeight: "90px",
+    resize: "vertical",
+    marginBottom: "14px",
+  },
+  submitBtn: {
+    width: "100%",
+    backgroundColor: "#f97316",
+    color: "#fff",
+    border: "none",
+    borderRadius: "12px",
+    padding: "14px",
+    fontSize: "15px",
+    fontWeight: "700",
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  emptyText: { textAlign: "center", color: "#9ca3af", padding: "20px 0", fontSize: "13px" },
+
+  // Review modal styles
+  reviewSummaryBox: {
+    background: "linear-gradient(135deg, #fff8f0 0%, #fff 100%)",
+    border: "1.5px solid #fed7aa",
+    borderRadius: "14px",
+    padding: "16px",
+    marginBottom: "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reviewSummaryLabel: { fontSize: "12px", color: "#f97316", fontWeight: "600", marginBottom: "4px" },
+  reviewSummaryTotal: { fontSize: "28px", fontWeight: "700", color: "#1a1a2e" },
+  reviewSummaryCount: { fontSize: "12px", color: "#9ca3af", marginTop: "2px" },
+
+  txnItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: "12px 0",
+    borderBottom: "1px solid #f3f4f6",
+  },
+  txnLeft: { flex: 1, minWidth: 0 },
+  txnName: { fontSize: "14px", fontWeight: "600", color: "#1a1a2e", marginBottom: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  txnMeta: { fontSize: "12px", color: "#9ca3af" },
+  txnRight: { textAlign: "right", flexShrink: 0, marginLeft: "12px" },
+  txnTotal: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e" },
+  txnUnit: { fontSize: "11px", color: "#9ca3af", marginTop: "2px" },
+
+  typeBadge: (type) => ({
+    display: "inline-block",
+    padding: "2px 8px",
+    borderRadius: "99px",
+    fontSize: "10px",
+    fontWeight: "700",
+    backgroundColor: type === "checkout" ? "#f0fdf4" : "#fff8f0",
+    color: type === "checkout" ? "#16a34a" : "#f97316",
+    marginTop: "3px",
+  }),
+};
+
+const TABS = ["Daily", "Weekly", "Monthly"];
+
+const formatDate = (d) => {
+  const date = new Date(d);
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const formatTime = (d) => {
+  const date = new Date(d);
+  return date.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true });
+};
+
+const formatChartDate = (d) => {
+  const date = new Date(d);
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: "#fff", border: "1px solid #fed7aa", borderRadius: "8px", padding: "8px 12px" }}>
+        <p style={{ margin: 0, fontSize: "12px", color: "#9ca3af" }}>{label}</p>
+        <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#f97316" }}>
+          ₱{parseFloat(payload[0].value).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+export default function Sales() {
+  const [activeTab, setActiveTab] = useState("Daily");
+  const [sales, setSales] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [reviewDate, setReviewDate] = useState(null); // date string "YYYY-MM-DD"
+  const [form, setForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    amount: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    fetchSales();
+    fetchProducts();
+  }, []);
+
+  const fetchSales = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/sales`);
+      setSales(res.data);
+    } catch (err) {
+      console.error("Error fetching sales:", err);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/products`);
+      setProducts(res.data);
+    } catch (err) {
+      console.error("Error fetching products:", err);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.amount || parseFloat(form.amount) <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    try {
+      await axios.post(`${BASE_URL}/sales`, {
+        productId: 0,
+        productName: form.notes || "Daily sales summary",
+        qty: 1,
+        unitPrice: parseFloat(form.amount),
+        saleDate: form.date,
+        notes: form.notes,
+        isDailySummary: true,
+      });
+      setShowModal(false);
+      setForm({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
+      fetchSales();
+    } catch (err) {
+      console.error("Error saving sale:", err);
+    }
+  };
+
+  const now = new Date();
+
+  const filterSales = (tab) => {
+    return sales.filter((s) => {
+      const d = new Date(s.saleDate);
+      if (tab === "Daily") {
+        return d.toDateString() === now.toDateString();
+      } else if (tab === "Weekly") {
+        const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+        return d >= weekAgo;
+      } else {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+    });
+  };
+
+  const filtered = filterSales(activeTab);
+  const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+
+  const prevFilter = (() => {
+    if (activeTab === "Daily") {
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      return sales.filter(s => new Date(s.saleDate).toDateString() === yesterday.toDateString());
+    } else if (activeTab === "Weekly") {
+      const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+      const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+      return sales.filter(s => { const d = new Date(s.saleDate); return d >= twoWeeksAgo && d < weekAgo; });
+    } else {
+      const lastMonth = new Date(now); lastMonth.setMonth(now.getMonth() - 1);
+      return sales.filter(s => { const d = new Date(s.saleDate); return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear(); });
+    }
+  })();
+  const prevTotal = prevFilter.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const changePct = prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(0) : null;
+
+  const chartData = (() => {
+    const days = activeTab === "Daily" ? 1 : activeTab === "Weekly" ? 7 : 30;
+    const map = {};
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const key = d.toISOString().split("T")[0];
+      map[key] = { date: formatChartDate(key), total: 0 };
+    }
+    sales.forEach((s) => {
+      const key = new Date(s.saleDate).toISOString().split("T")[0];
+      if (map[key]) map[key].total += parseFloat(s.total || s.unitPrice || 0);
+    });
+    return Object.values(map);
+  })();
+
+  const slowMoving = [...products].sort((a, b) => b.stock - a.stock).slice(0, 3);
+
+  const recentByDate = Object.values(
+    sales.reduce((acc, s) => {
+      const key = new Date(s.saleDate).toISOString().split("T")[0];
+      if (!acc[key]) acc[key] = { date: key, total: 0, count: 0 };
+      acc[key].total += parseFloat(s.total || s.unitPrice || 0);
+      acc[key].count += 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 7);
+
+  // ── Review: get all sales for a specific date ───────────────────────────
+  const reviewSales = reviewDate
+    ? sales.filter(s => new Date(s.saleDate).toISOString().split("T")[0] === reviewDate)
+        .sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
+    : [];
+
+  const reviewTotal = reviewSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+
+  // Detect if a sale came from checkout (has a real productId > 0) or manual entry
+  const getTxnType = (s) => (s.productId && parseInt(s.productId) > 0 ? "checkout" : "manual");
+
+  return (
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+      <div style={S.page}>
+        <div style={S.header}>
+          <h1 style={S.title}>Sales Overview</h1>
+        </div>
+
+        <div style={S.body}>
+          {/* Tab Bar */}
+          <div style={S.tabBar}>
+            {TABS.map((t) => (
+              <button key={t} style={S.tab(activeTab === t)} onClick={() => setActiveTab(t)}>{t}</button>
+            ))}
+          </div>
+
+          {/* Total Card */}
+          <div style={S.totalCard}>
+            <div style={S.totalLabel}>Total Sales ({activeTab.toLowerCase()})</div>
+            <div style={S.totalAmount}>
+              ₱{total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </div>
+            <div style={S.totalChange}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
+              </svg>
+              {changePct !== null ? `${changePct > 0 ? "+" : ""}${changePct}% vs last period` : "No previous data"}
+            </div>
+          </div>
+
+          {/* Sales Trend Chart */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>Sales Trend</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#f97316"
+                  strokeWidth={2.5}
+                  dot={{ fill: "#f97316", r: 4, strokeWidth: 0 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Slow Moving Items */}
+          <div style={S.card}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Slow Moving Items</span>
+            </div>
+            <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 10px" }}>Consider running a promotion for these items.</p>
+            {slowMoving.length === 0 ? (
+              <div style={S.emptyText}>No products found.</div>
+            ) : (
+              slowMoving.map((p) => (
+                <div key={p.id} style={S.slowItem}>
+                  <span style={S.slowName}>{p.name}</span>
+                  <span style={S.slowStock}>{p.stock} in stock</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Recent Records */}
+          <div style={S.card}>
+            <div style={S.cardTitle}>Recent Records</div>
+            {recentByDate.length === 0 ? (
+              <div style={S.emptyText}>No sales recorded yet. Tap + to add.</div>
+            ) : (
+              recentByDate.map((r) => (
+                <div key={r.date} style={S.recordItem} onClick={() => setReviewDate(r.date)}>
+                  <div>
+                    <div style={S.recordDate}>{formatDate(r.date)}</div>
+                    <div style={S.recordSub}>{r.count} transaction{r.count !== 1 ? "s" : ""}</div>
+                  </div>
+                  <div style={S.recordRight}>
+                    <div style={S.recordAmount}>
+                      ₱{parseFloat(r.total).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* FAB */}
+        <button style={S.fab} onClick={() => setShowModal(true)}>+</button>
+
+        {/* ── Record Daily Sales Modal ── */}
+        {showModal && (
+          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
+            <div style={S.modal}>
+              <div style={S.modalHeader}>
+                <h2 style={S.modalTitle}>Record Daily Sales</h2>
+                <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
+              </div>
+
+              <form onSubmit={handleSubmit}>
+                <label style={S.label}>Date</label>
+                <input
+                  style={S.input}
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                />
+                <label style={S.label}>Total Amount</label>
+                <input
+                  style={S.input}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                />
+                <label style={S.label}>Notes</label>
+                <textarea
+                  style={S.textarea}
+                  placeholder="Optional notes..."
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+                <button type="submit" style={S.submitBtn}>Save Record</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Review Modal ── */}
+        {reviewDate && (
+          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setReviewDate(null)}>
+            <div style={S.modal}>
+              <div style={S.modalHeader}>
+                <h2 style={S.modalTitle}>Sales Review</h2>
+                <button style={S.closeBtn} onClick={() => setReviewDate(null)}>✕</button>
+              </div>
+              <div style={S.modalSub}>{formatDate(reviewDate)}</div>
+
+              {/* Summary card */}
+              <div style={S.reviewSummaryBox}>
+                <div>
+                  <div style={S.reviewSummaryLabel}>TOTAL REVENUE</div>
+                  <div style={S.reviewSummaryTotal}>
+                    ₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div style={S.reviewSummaryCount}>
+                    {reviewSales.length} transaction{reviewSales.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fed7aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                  <polyline points="16 7 22 7 22 13" />
+                </svg>
+              </div>
+
+              {/* Transaction list */}
+              {reviewSales.length === 0 ? (
+                <div style={S.emptyText}>No transactions found for this date.</div>
+              ) : (
+                reviewSales.map((s) => {
+                  const type = getTxnType(s);
+                  const qty = parseInt(s.qty) || 1;
+                  const unitPrice = parseFloat(s.unitPrice) || 0;
+                  const total = parseFloat(s.total || unitPrice * qty);
+                  return (
+                    <div key={s.id} style={S.txnItem}>
+                      <div style={S.txnLeft}>
+                        <div style={S.txnName}>{s.productName || "Manual Entry"}</div>
+                        <div style={S.txnMeta}>
+                          {formatTime(s.saleDate)}
+                          {qty > 1 && ` · qty ${qty}`}
+                          {unitPrice > 0 && ` · ₱${unitPrice.toFixed(2)}/ea`}
+                        </div>
+                        <div style={S.typeBadge(type)}>
+                          {type === "checkout" ? "✓ Checkout" : "Manual"}
+                        </div>
+                      </div>
+                      <div style={S.txnRight}>
+                        <div style={S.txnTotal}>
+                          ₱{total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
