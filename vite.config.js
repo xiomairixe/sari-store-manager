@@ -1,10 +1,9 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import vue from '@vitejs/plugin-vue' // or react plugin if using React
 
-// https://vite.dev/config/
-export default {
-  server: {
-    host: "0.0.0.0",
-    port: 5173,
+export default defineConfig({
+  plugins: [vue()],
+  build: {
+    outDir: 'public', // <-- change 'public' to whatever you want
   }
-}
+})
