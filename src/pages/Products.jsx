@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import React from "react";
 
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "https://sari-store-manager.onrender.com";
 const getImageUrl = (image) => {
   if (!image) return null;
   if (image.startsWith("http")) return image;
@@ -12,7 +12,7 @@ const getImageUrl = (image) => {
 const CATEGORIES = ["All", "Snacks", "Beverages", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
-const API_URL = "http://localhost:5000/products";
+const API_URL = "https://sari-store-manager.onrender.com";
 
 const styles = {
   page: {
