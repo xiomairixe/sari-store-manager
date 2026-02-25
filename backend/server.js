@@ -169,6 +169,8 @@ app.delete("/costs/:id", async (req, res) => {
 });
 
 // ── UTANG ──
+
+// Get all customers
 app.get("/utang/customers", async (req, res) => {
   try {
     const customers = await Utang.find().sort({ customerName: 1 });
@@ -176,14 +178,45 @@ app.get("/utang/customers", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Add new customer
 app.post("/utang/customers", async (req, res) => {
   try {
-    const customer = new Utang({ ...req.body, amount: 0, amountPaid: 0, status: "unpaid" });
+    const customer = new Utang({
+      customerName: req.body.customerName,
+      phone: req.body.phone || "",
+      creditLimit: req.body.creditLimit || 1000,
+      amount: 0,
+      amountPaid: 0,
+      balance: 0,
+      status: "unpaid",
+    });
     await customer.save();
     res.status(201).json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ✅ Add utang (increase debt) to a customer
+app.post("/utang/customers/:id/add", async (req, res) => {
+  try {
+    const { amount, notes } = req.body;
+    const customer = await Utang.findById(req.params.id);
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+
+    customer.amount += parseFloat(amount);
+    customer.balance = customer.amount - customer.amountPaid;
+
+    if (customer.balance <= 0) customer.status = "paid";
+    else if (customer.amountPaid > 0) customer.status = "partial";
+    else customer.status = "unpaid";
+
+    if (notes) customer.notes = notes;
+
+    await customer.save();
+    res.json(customer);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ✅ Record payment (decrease debt) from a customer
 app.put("/utang/customers/:id/pay", async (req, res) => {
   try {
     const { amountPaid } = req.body;
@@ -191,7 +224,9 @@ app.put("/utang/customers/:id/pay", async (req, res) => {
     if (!customer) return res.status(404).json({ error: "Customer not found" });
 
     customer.amountPaid += parseFloat(amountPaid);
-    if (customer.amountPaid >= customer.amount) customer.status = "paid";
+    customer.balance = customer.amount - customer.amountPaid;
+
+    if (customer.balance <= 0) customer.status = "paid";
     else if (customer.amountPaid > 0) customer.status = "partial";
     else customer.status = "unpaid";
 
@@ -200,6 +235,7 @@ app.put("/utang/customers/:id/pay", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Delete customer
 app.delete("/utang/customers/:id", async (req, res) => {
   try {
     await Utang.findByIdAndDelete(req.params.id);
