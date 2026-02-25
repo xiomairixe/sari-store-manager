@@ -4,9 +4,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
+import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 dotenv.config();
 
@@ -28,33 +29,42 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// ── Uploads folder ──
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-app.use("/uploads", express.static(uploadsDir));
-
 // ── MongoDB Connection ──
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("✅ MongoDB connected successfully!"))
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
-// ── Multer Setup ──
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) =>
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
+// ── Cloudinary Config ──
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|webp|gif/;
-    const ok =
-      allowed.test(path.extname(file.originalname).toLowerCase()) &&
-      allowed.test(file.mimetype);
-    ok ? cb(null, true) : cb(new Error("Images only!"));
+
+// ── Multer + Cloudinary Storage ──
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "sari-store",
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
   },
-  limits: { fileSize: 5 * 1024 * 1024 },
 });
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+// ── Helper: delete image from Cloudinary ──
+const deleteCloudinaryImage = async (imageUrl) => {
+  if (!imageUrl || !imageUrl.includes("cloudinary.com")) return;
+  try {
+    const parts = imageUrl.split("/");
+    const filenameWithExt = parts[parts.length - 1];
+    const folder = parts[parts.length - 2];
+    const publicId = `${folder}/${filenameWithExt.split(".")[0]}`;
+    await cloudinary.uploader.destroy(publicId);
+  } catch (err) {
+    console.error("Failed to delete Cloudinary image:", err.message);
+  }
+};
 
 // ── Models ──
 import Product from "./models/product.js";
@@ -81,7 +91,15 @@ app.get("/products/:id", async (req, res) => {
 app.post("/products", upload.single("image"), async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.image = req.file.filename;
+    if (req.file) data.image = req.file.path;
+
+    // ── Stock is always saved in PIECES ──
+    // If bulk (pack/box) and owner entered packs, convert to pcs before saving
+    const isBulk = ["pack", "box"].includes(data.unit);
+    if (isBulk && data.pcsPerUnit && parseFloat(data.pcsPerUnit) > 0) {
+      data.stock = parseFloat(data.stock) * parseFloat(data.pcsPerUnit);
+    }
+
     const product = new Product(data);
     await product.save();
     res.status(201).json(product);
@@ -92,13 +110,19 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
   try {
     const data = { ...req.body };
     if (req.file) {
-      data.image = req.file.filename;
       const old = await Product.findById(req.params.id);
-      if (old && old.image && !old.image.startsWith("http")) {
-        const oldPath = path.join(uploadsDir, old.image);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
+      if (old?.image) await deleteCloudinaryImage(old.image);
+      data.image = req.file.path;
     }
+
+    // ── If stock was re-entered in packs, convert to pcs ──
+    // Frontend sends stockInPacks flag when owner edits stock count
+    const isBulk = ["pack", "box"].includes(data.unit);
+    if (isBulk && data.pcsPerUnit && data.stockInPacks === "true") {
+      data.stock = parseFloat(data.stock) * parseFloat(data.pcsPerUnit);
+    }
+    delete data.stockInPacks; // clean up before saving
+
     const updated = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
     res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -107,10 +131,7 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
 app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-    if (product && product.image && !product.image.startsWith("http")) {
-      const filePath = path.join(uploadsDir, product.image);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
+    if (product?.image) await deleteCloudinaryImage(product.image);
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: "Product deleted" });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -134,10 +155,11 @@ app.post("/sales", async (req, res) => {
     });
     await sale.save();
 
+    // ── Stock is always in PIECES, so just deduct qty directly ──
     if (productId) {
       const product = await Product.findById(productId);
       if (product) {
-        product.stock -= qty;
+        product.stock = Math.max(0, product.stock - parseInt(qty));
         await product.save();
       }
     }
@@ -169,8 +191,6 @@ app.delete("/costs/:id", async (req, res) => {
 });
 
 // ── UTANG ──
-
-// Get all customers
 app.get("/utang/customers", async (req, res) => {
   try {
     const customers = await Utang.find().sort({ customerName: 1 });
@@ -178,64 +198,50 @@ app.get("/utang/customers", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Add new customer
 app.post("/utang/customers", async (req, res) => {
   try {
     const customer = new Utang({
       customerName: req.body.customerName,
       phone: req.body.phone || "",
       creditLimit: req.body.creditLimit || 1000,
-      amount: 0,
-      amountPaid: 0,
-      balance: 0,
-      status: "unpaid",
+      amount: 0, amountPaid: 0, balance: 0, status: "unpaid",
     });
     await customer.save();
     res.status(201).json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ✅ Add utang (increase debt) to a customer
 app.post("/utang/customers/:id/add", async (req, res) => {
   try {
     const { amount, notes } = req.body;
     const customer = await Utang.findById(req.params.id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
-
     customer.amount += parseFloat(amount);
     customer.balance = customer.amount - customer.amountPaid;
-
     if (customer.balance <= 0) customer.status = "paid";
     else if (customer.amountPaid > 0) customer.status = "partial";
     else customer.status = "unpaid";
-
     if (notes) customer.notes = notes;
-
     await customer.save();
     res.json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ✅ Record payment (decrease debt) from a customer
 app.put("/utang/customers/:id/pay", async (req, res) => {
   try {
     const { amountPaid } = req.body;
     const customer = await Utang.findById(req.params.id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
-
     customer.amountPaid += parseFloat(amountPaid);
     customer.balance = customer.amount - customer.amountPaid;
-
     if (customer.balance <= 0) customer.status = "paid";
     else if (customer.amountPaid > 0) customer.status = "partial";
     else customer.status = "unpaid";
-
     await customer.save();
     res.json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Delete customer
 app.delete("/utang/customers/:id", async (req, res) => {
   try {
     await Utang.findByIdAndDelete(req.params.id);

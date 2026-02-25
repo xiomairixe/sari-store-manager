@@ -12,7 +12,7 @@ const getImageUrl = (image) => {
   return `${BASE_URL}/uploads/${image}`;
 };
 
-const CATEGORIES = ["All", "Snacks", "Beverages", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
+const CATEGORIES = ["All", "Snacks", "Beverages","Candies", "Cigarettes", "Seasonings","Noodles", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
 

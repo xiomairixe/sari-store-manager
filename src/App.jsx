@@ -5,6 +5,7 @@ import Sales from "./pages/Sales";
 import Costs from "./pages/Costs";
 import Utang from "./pages/Utang";
 import Checkout from "./pages/CheckOut";
+import Suppliers from "./pages/Suppliers";
 import Navbar from "./layout/Navbar";
 import React from "react";
 
@@ -19,6 +20,7 @@ function App() {
         <Route path="/costs" element={<Costs />} />
         <Route path="/utang" element={<Utang />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/suppliers" element={<Suppliers />} />
       </Routes>
     </Router>
   );
