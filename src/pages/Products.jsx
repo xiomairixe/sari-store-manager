@@ -642,7 +642,7 @@ export default function Products() {
                 </div>
 
                 <button type="submit" style={styles.submitBtn}>{editId ? "Update Product" : "Add Product"}</button>
-              </form>
+              </baseURL: "https://sari-store-api.onrender.com"form>
             </div>
           </div>
         )}
