@@ -3,7 +3,7 @@ import axios from "axios";
 import React from "react";
 
 // ── Use environment variable for API base URL ──
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://sari-store-manager.onrender.com";
 const API_URL = `${BASE_URL}/products`;
 
 const getImageUrl = (image) => {
@@ -642,7 +642,7 @@ export default function Products() {
                 </div>
 
                 <button type="submit" style={styles.submitBtn}>{editId ? "Update Product" : "Add Product"}</button>
-              </baseURL: "https://sari-store-api.onrender.com"form>
+              </form>
             </div>
           </div>
         )}
