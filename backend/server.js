@@ -43,10 +43,10 @@ const upload = multer({
 });
 
 // ── Models ──
-import Product from "./models/product.js";
-import Sale from "./models/sale.js";
-import Cost from "./models/cost.js";
-import Utang from "./models/utang.js";
+import Product from "../sari-store-api/models/product.js";
+import Sale from "../sari-store-api/models/sale.js";
+import Cost from "../sari-store-api/models/cost.js";
+import Utang from "../sari-store-api/models/utang.js";
 
 // ── PRODUCTS ──
 app.get("/products", async (req, res) => {
