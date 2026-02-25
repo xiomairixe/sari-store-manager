@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import React from "react";
 
-const BASE_URL = "https://sari-store-manager.onrender.com";
+// ── Use environment variable for API base URL ──
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = `${BASE_URL}/products`;
+
 const getImageUrl = (image) => {
   if (!image) return null;
   if (image.startsWith("http")) return image;
@@ -12,7 +15,6 @@ const getImageUrl = (image) => {
 const CATEGORIES = ["All", "Snacks", "Beverages", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
-const API_URL = "https://sari-store-manager.onrender.com";
 
 const styles = {
   page: {
@@ -62,8 +64,6 @@ const styles = {
   productList: {
     padding: "8px 20px", display: "flex", flexDirection: "column", gap: "12px",
   },
-
-  // ── Product card: grayed out when out of stock ──
   productCard: (outOfStock) => ({
     backgroundColor: outOfStock ? "#f9fafb" : "#fff",
     borderRadius: "16px", padding: "14px",
@@ -99,22 +99,17 @@ const styles = {
     borderRadius: "20px", marginBottom: "6px",
   }),
   costText: { fontSize: "12px", color: "#9ca3af", margin: 0 },
-
-  // Stock badge — red when 0, yellow when low, green when ok
   stockBadge: (qty) => ({
     position: "absolute", top: "14px", right: "14px",
     backgroundColor: qty === 0 ? "#fee2e2" : qty <= 10 ? "#fef3c7" : "#ecfdf5",
     color: qty === 0 ? "#ef4444" : qty <= 10 ? "#d97706" : "#059669",
     fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "20px",
   }),
-
   sellingPrice: (outOfStock) => ({
     fontSize: "16px", fontWeight: "700",
     color: outOfStock ? "#9ca3af" : "#f97316",
     position: "absolute", bottom: "14px", right: "14px",
   }),
-
-  // Out of stock banner strip at bottom of card
   outOfStockStrip: {
     position: "absolute",
     bottom: 0, left: 0, right: 0,
@@ -127,7 +122,6 @@ const styles = {
     color: "#ef4444",
     letterSpacing: "0.05em",
   },
-
   fab: {
     position: "fixed", bottom: "85px", right: "20px",
     width: "52px", height: "52px", borderRadius: "50%",
@@ -323,7 +317,7 @@ export default function Products() {
       expiry: product.expiry ? product.expiry.split("T")[0] : "",
       supplier: product.supplier || "",
     });
-    setEditId(product.id);
+    setEditId(product._id); // ✅ fixed: was product.id
     setImagePreview(getImageUrl(product.image) || null);
     setImageFile(null); setShowModal(true); setContextMenu(null);
   };
@@ -366,7 +360,6 @@ export default function Products() {
     setContextMenu({ x: touch.clientX, y: touch.clientY, product });
   };
 
-  // Sort: in-stock first, out-of-stock at the bottom
   const filtered = products
     .filter((p) => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -445,7 +438,7 @@ export default function Products() {
 
               return (
                 <div
-                  key={product.id}
+                  key={product._id} // ✅ fixed: was product.id
                   style={styles.productCard(outOfStock)}
                   onContextMenu={(e) => { e.preventDefault(); handleLongPress(e, product); }}
                   onTouchStart={(e) => {
@@ -472,12 +465,10 @@ export default function Products() {
                     </p>
                   </div>
 
-                  {/* Stock badge */}
                   <div style={styles.stockBadge(stock)}>
                     {outOfStock ? "No Stock" : `${stock} ${product.unit}`}
                   </div>
 
-                  {/* Selling price — hidden if out of stock, replaced by strip */}
                   {!outOfStock && (
                     <div style={styles.sellingPrice(false)}>
                       ₱{parseFloat(sp).toFixed(2)}
@@ -485,7 +476,6 @@ export default function Products() {
                     </div>
                   )}
 
-                  {/* Out of stock strip */}
                   {outOfStock && (
                     <div style={styles.outOfStockStrip}>
                       OUT OF STOCK · Restock needed
@@ -507,7 +497,7 @@ export default function Products() {
             style={{ ...styles.contextMenu, left: Math.min(contextMenu.x, window.innerWidth - 180), top: Math.min(contextMenu.y, window.innerHeight - 120) }}
           >
             <button style={styles.contextItem(false)} onClick={() => openEdit(contextMenu.product)}>✏️ Edit</button>
-            <button style={styles.contextItem(true)} onClick={() => handleDelete(contextMenu.product.id)}>🗑️ Delete</button>
+            <button style={styles.contextItem(true)} onClick={() => handleDelete(contextMenu.product._id)}>🗑️ Delete</button>
           </div>
         )}
 

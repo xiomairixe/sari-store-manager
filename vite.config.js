@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue' // or react plugin if using React
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
   build: {
-    outDir: 'public', // <-- change 'public' to whatever you want
-  }
+    outDir: 'dist',
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

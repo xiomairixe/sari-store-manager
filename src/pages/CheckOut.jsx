@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import React from "react";
 
-const BASE_URL = "http://192.168.1.4:5000";
+// ── Fixed: use env var instead of hardcoded local IP ──
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const BULK_UNITS = ["pack", "box"];
 
 const getImageUrl = (image) => {
@@ -48,7 +49,6 @@ const S = {
   },
   title: { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   subtitle: { fontSize: "13px", color: "#9ca3af", marginLeft: "48px", marginTop: "2px" },
-
   searchWrapper: { padding: "4px 20px 8px" },
   searchBox: {
     display: "flex", alignItems: "center", gap: "10px",
@@ -58,7 +58,6 @@ const S = {
     border: "none", background: "transparent", outline: "none",
     fontSize: "14px", color: "#333", width: "100%", fontFamily: "'DM Sans', sans-serif",
   },
-
   categoryScroll: {
     display: "flex", gap: "8px", overflowX: "auto",
     padding: "4px 20px 10px", scrollbarWidth: "none",
@@ -72,8 +71,6 @@ const S = {
     fontFamily: "'DM Sans', sans-serif", transition: "all 0.15s ease",
     whiteSpace: "nowrap",
   }),
-
-  // Grid layout matching screenshot
   productGrid: {
     padding: "0 16px",
     display: "grid",
@@ -106,7 +103,6 @@ const S = {
   priceRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" },
   price: { fontSize: "16px", fontWeight: "700", color: "#f97316" },
   stockLabel: { fontSize: "11px", color: "#9ca3af" },
-
   addBtn: (inCart) => ({
     width: "100%", padding: "8px 0",
     backgroundColor: inCart ? "#fff8f0" : "#f97316",
@@ -118,7 +114,6 @@ const S = {
     display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
     transition: "all 0.15s ease",
   }),
-
   cartBadge: {
     position: "absolute", top: "8px", right: "8px",
     backgroundColor: "#f97316", color: "#fff",
@@ -135,8 +130,6 @@ const S = {
     backgroundColor: "#fee2e2", color: "#ef4444",
     fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "99px",
   },
-
-  // Cart bottom bar
   cartBar: {
     position: "fixed", bottom: "70px", left: 0, right: 0,
     backgroundColor: "#1a1a2e",
@@ -157,8 +150,6 @@ const S = {
     cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
     display: "flex", alignItems: "center", justifyContent: "space-between",
   },
-
-  // Cart Modal
   overlay: {
     position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
     zIndex: 200, display: "flex", alignItems: "flex-end",
@@ -174,8 +165,6 @@ const S = {
   },
   modalTitle: { fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
-
-  // Cart Items
   cartItem: {
     display: "flex", gap: "12px", alignItems: "center",
     padding: "12px 0", borderBottom: "1px solid #f3f4f6",
@@ -194,16 +183,12 @@ const S = {
   },
   qtyNum: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", minWidth: "20px", textAlign: "center" },
   cartItemTotal: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", textAlign: "right", minWidth: "60px" },
-
-  // Summary
   summaryBox: {
     backgroundColor: "#f9fafb", borderRadius: "14px",
     padding: "14px 16px", margin: "16px 0",
   },
   summaryRow: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#6b7280", marginBottom: "8px" },
   summaryTotal: { display: "flex", justifyContent: "space-between", fontSize: "17px", fontWeight: "700", color: "#1a1a2e", borderTop: "1px solid #e5e7eb", paddingTop: "10px", marginTop: "4px" },
-
-  // Payment
   sectionTitle: { fontSize: "14px", fontWeight: "700", color: "#374151", marginBottom: "10px" },
   paymentOptions: { display: "flex", gap: "8px", marginBottom: "16px" },
   paymentBtn: (active) => ({
@@ -238,8 +223,6 @@ const S = {
     cursor: disabled ? "not-allowed" : "pointer",
     fontFamily: "'DM Sans', sans-serif", marginTop: "4px",
   }),
-
-  // Success screen
   successOverlay: {
     position: "fixed", inset: 0, backgroundColor: "#fff",
     zIndex: 300, display: "flex", flexDirection: "column",
@@ -260,10 +243,7 @@ const S = {
     color: "#fff", fontSize: "16px", fontWeight: "700",
     cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
   },
-
   emptyCart: { textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: "14px" },
-
-  // Utang customer select
   utangSection: { marginBottom: "16px" },
   customerOption: (active) => ({
     display: "flex", alignItems: "center", gap: "10px",
@@ -281,9 +261,9 @@ export default function Checkout() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [cart, setCart] = useState({}); // { productId: { product, qty } }
-  const [modal, setModal] = useState(null); // "cart" | "success"
-  const [paymentMode, setPaymentMode] = useState("cash"); // "cash" | "utang"
+  const [cart, setCart] = useState({});
+  const [modal, setModal] = useState(null);
+  const [paymentMode, setPaymentMode] = useState("cash");
   const [cashInput, setCashInput] = useState("");
   const [utangCustomers, setUtangCustomers] = useState([]);
   const [selectedUtangCustomer, setSelectedUtangCustomer] = useState(null);
@@ -306,16 +286,14 @@ export default function Checkout() {
     } catch (err) { console.error(err); }
   };
 
-  // ── Cart helpers ────────────────────────────────────────────────────────
+  // ── Cart helpers ──
   const addToCart = (product) => {
     setCart(prev => {
-      const existing = prev[product.id];
+      const id = product._id; // ✅ fixed
+      const existing = prev[id];
       const currentQty = existing ? existing.qty : 0;
-      if (currentQty >= product.stock) return prev; // can't exceed stock
-      return {
-        ...prev,
-        [product.id]: { product, qty: currentQty + 1 },
-      };
+      if (currentQty >= product.stock) return prev;
+      return { ...prev, [id]: { product, qty: currentQty + 1 } };
     });
   };
 
@@ -340,7 +318,6 @@ export default function Checkout() {
   const cashPaid = parseFloat(cashInput) || 0;
   const change = cashPaid - subtotal;
 
-  // ── Checkout ────────────────────────────────────────────────────────────
   const handleConfirm = async () => {
     if (cartItems.length === 0) return;
     if (paymentMode === "cash" && cashPaid < subtotal) return;
@@ -348,10 +325,9 @@ export default function Checkout() {
 
     setLoading(true);
     try {
-      // Post each cart item as a sale
       for (const { product, qty } of cartItems) {
         await axios.post(`${BASE_URL}/sales`, {
-          productId: product.id,
+          productId: product._id, // ✅ fixed
           productName: product.name,
           qty,
           unitPrice: getSellingPrice(product),
@@ -359,9 +335,8 @@ export default function Checkout() {
         });
       }
 
-      // If utang, add to customer's debt
       if (paymentMode === "utang" && selectedUtangCustomer) {
-        await axios.post(`${BASE_URL}/utang/customers/${selectedUtangCustomer.id}/add`, {
+        await axios.post(`${BASE_URL}/utang/customers/${selectedUtangCustomer._id}/add`, { // ✅ fixed
           amount: subtotal,
           notes: `Checkout: ${cartItems.map(i => `${i.product.name} x${i.qty}`).join(", ")}`,
         });
@@ -393,7 +368,6 @@ export default function Checkout() {
     setPaymentMode("cash");
   };
 
-  // ── Filtered products ───────────────────────────────────────────────────
   const filtered = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = activeCategory === "All" || p.category === activeCategory;
@@ -405,7 +379,6 @@ export default function Checkout() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <div style={S.page}>
-        {/* Header */}
         <div style={S.header}>
           <div style={S.headerTop}>
             <h1 style={S.title}>Checkout</h1>
@@ -413,86 +386,53 @@ export default function Checkout() {
           <div style={S.subtitle}>Tap products to add to cart</div>
         </div>
 
-        {/* Search */}
         <div style={S.searchWrapper}>
           <div style={S.searchBox}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <input
-              style={S.searchInput}
-              placeholder="Search products..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <input style={S.searchInput} placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
-        {/* Categories */}
         <div style={S.categoryScroll}>
           {CATEGORIES.map(cat => (
-            <button key={cat} style={S.categoryChip(activeCategory === cat)} onClick={() => setActiveCategory(cat)}>
-              {cat}
-            </button>
+            <button key={cat} style={S.categoryChip(activeCategory === cat)} onClick={() => setActiveCategory(cat)}>{cat}</button>
           ))}
         </div>
 
-        {/* Product Grid */}
         <div style={S.productGrid}>
           {filtered.map(product => {
             const sp = getSellingPrice(product);
-            const cartItem = cart[product.id];
+            const cartItem = cart[product._id]; // ✅ fixed
             const inCart = !!cartItem;
             const outOfStock = product.stock <= 0;
             const isBulk = BULK_UNITS.includes(product.unit);
 
             return (
-              <div key={product.id} style={S.productCard(inCart)}>
-                {/* Image */}
+              <div key={product._id} style={S.productCard(inCart)}> {/* ✅ fixed */}
                 {getImageUrl(product.image) ? (
                   <img src={getImageUrl(product.image)} alt={product.name} style={S.productImg} />
                 ) : (
                   <div style={S.productImgPlaceholder}>📦</div>
                 )}
-
-                {/* Cart badge */}
                 {inCart && <div style={S.cartBadge}>{cartItem.qty}</div>}
-
                 <div style={S.productBody}>
                   <p style={S.productName}>{product.name}</p>
                   <div style={S.priceRow}>
                     <span style={S.price}>₱{sp.toFixed(2)}{isBulk ? <span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span> : ""}</span>
                     <span style={S.stockLabel}>{product.stock} left</span>
                   </div>
-                  <button
-                    style={S.addBtn(inCart)}
-                    onClick={() => addToCart(product)}
-                    disabled={outOfStock}
-                  >
-                    {inCart ? (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        Add More
-                      </>
-                    ) : (
-                      <>+ Add</>
-                    )}
+                  <button style={S.addBtn(inCart)} onClick={() => addToCart(product)} disabled={outOfStock}>
+                    {inCart ? (<><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>Add More</>) : <>+ Add</>}
                   </button>
                 </div>
-
-                {outOfStock && (
-                  <div style={S.outOfStock}>
-                    <span style={S.outOfStockText}>Out of Stock</span>
-                  </div>
-                )}
+                {outOfStock && <div style={S.outOfStock}><span style={S.outOfStockText}>Out of Stock</span></div>}
               </div>
             );
           })}
         </div>
 
-        {/* Cart Bottom Bar */}
         {cartCount > 0 && modal !== "cart" && (
           <div style={S.cartBar}>
             <div style={S.cartBarRow}>
@@ -500,22 +440,17 @@ export default function Checkout() {
                 <div style={S.cartBarLabel}>Total Amount</div>
                 <div style={S.cartBarTotal}>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
               </div>
-              <div style={{ ...S.cartBarItems, textAlign: "right" }}>
-                <span style={{ backgroundColor: "#f97316", color: "#fff", borderRadius: "99px", padding: "2px 10px", fontSize: "13px", fontWeight: "700" }}>
-                  {cartCount} item{cartCount !== 1 ? "s" : ""}
-                </span>
-              </div>
+              <span style={{ backgroundColor: "#f97316", color: "#fff", borderRadius: "99px", padding: "2px 10px", fontSize: "13px", fontWeight: "700" }}>
+                {cartCount} item{cartCount !== 1 ? "s" : ""}
+              </span>
             </div>
             <button style={S.viewCartBtn} onClick={() => setModal("cart")}>
               <span>Review & Pay</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
         )}
 
-        {/* ── Cart & Payment Modal ── */}
         {modal === "cart" && (
           <div style={S.overlay} onClick={e => e.target === e.currentTarget && setModal(null)}>
             <div style={S.modal}>
@@ -524,7 +459,6 @@ export default function Checkout() {
                 <button style={S.closeBtn} onClick={() => setModal(null)}>✕</button>
               </div>
 
-              {/* Cart Items */}
               {cartItems.length === 0 ? (
                 <div style={S.emptyCart}>Cart is empty</div>
               ) : (
@@ -532,7 +466,7 @@ export default function Checkout() {
                   {cartItems.map(({ product, qty }) => {
                     const sp = getSellingPrice(product);
                     return (
-                      <div key={product.id} style={S.cartItem}>
+                      <div key={product._id} style={S.cartItem}> {/* ✅ fixed */}
                         {getImageUrl(product.image) ? (
                           <img src={getImageUrl(product.image)} alt={product.name} style={S.cartItemImg} />
                         ) : (
@@ -543,55 +477,31 @@ export default function Checkout() {
                           <p style={S.cartItemPrice}>₱{sp.toFixed(2)} each</p>
                         </div>
                         <div style={S.qtyControl}>
-                          <button style={S.qtyBtn} onClick={() => updateQty(product.id, -1)}>−</button>
+                          <button style={S.qtyBtn} onClick={() => updateQty(product._id, -1)}>−</button> {/* ✅ fixed */}
                           <span style={S.qtyNum}>{qty}</span>
-                          <button style={S.qtyBtn} onClick={() => updateQty(product.id, 1)}>+</button>
+                          <button style={S.qtyBtn} onClick={() => updateQty(product._id, 1)}>+</button> {/* ✅ fixed */}
                         </div>
-                        <div style={S.cartItemTotal}>
-                          ₱{(sp * qty).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </div>
+                        <div style={S.cartItemTotal}>₱{(sp * qty).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
                       </div>
                     );
                   })}
 
-                  {/* Summary */}
                   <div style={S.summaryBox}>
-                    <div style={S.summaryRow}>
-                      <span>Items ({cartCount})</span>
-                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div style={S.summaryTotal}>
-                      <span>Total</span>
-                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-                    </div>
+                    <div style={S.summaryRow}><span>Items ({cartCount})</span><span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+                    <div style={S.summaryTotal}><span>Total</span><span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
                   </div>
 
-                  {/* Payment Mode */}
                   <div style={S.sectionTitle}>Payment Method</div>
                   <div style={S.paymentOptions}>
-                    <button style={S.paymentBtn(paymentMode === "cash")} onClick={() => setPaymentMode("cash")}>
-                      💵 Cash
-                    </button>
-                    <button style={S.paymentBtn(paymentMode === "utang")} onClick={() => setPaymentMode("utang")}>
-                      📒 Utang
-                    </button>
-                    <button style={S.paymentBtn(paymentMode === "gcash")} onClick={() => setPaymentMode("gcash")}>
-                      📱 GCash
-                    </button>
+                    <button style={S.paymentBtn(paymentMode === "cash")} onClick={() => setPaymentMode("cash")}>💵 Cash</button>
+                    <button style={S.paymentBtn(paymentMode === "utang")} onClick={() => setPaymentMode("utang")}>📒 Utang</button>
+                    <button style={S.paymentBtn(paymentMode === "gcash")} onClick={() => setPaymentMode("gcash")}>📱 GCash</button>
                   </div>
 
-                  {/* Cash input */}
                   {paymentMode === "cash" && (
                     <>
                       <label style={S.label}>Cash Received (₱)</label>
-                      <input
-                        style={S.input}
-                        type="number"
-                        placeholder="0.00"
-                        value={cashInput}
-                        onChange={e => setCashInput(e.target.value)}
-                        autoFocus
-                      />
+                      <input style={S.input} type="number" placeholder="0.00" value={cashInput} onChange={e => setCashInput(e.target.value)} autoFocus />
                       {cashPaid >= subtotal && (
                         <div style={S.changeBox}>
                           <span style={S.changeLabel}>Change</span>
@@ -601,14 +511,12 @@ export default function Checkout() {
                     </>
                   )}
 
-                  {/* GCash — no extra input needed */}
                   {paymentMode === "gcash" && (
                     <div style={{ backgroundColor: "#eff6ff", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", fontSize: "13px", color: "#1e40af" }}>
                       📱 GCash payment of <strong>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</strong> — confirm once received.
                     </div>
                   )}
 
-                  {/* Utang — pick customer */}
                   {paymentMode === "utang" && (
                     <div style={S.utangSection}>
                       <div style={S.sectionTitle}>Select Customer</div>
@@ -620,11 +528,7 @@ export default function Checkout() {
                           const limit = parseFloat(c.creditLimit || 1000);
                           const wouldExceed = balance + subtotal > limit;
                           return (
-                            <div
-                              key={c.id}
-                              style={S.customerOption(selectedUtangCustomer?.id === c.id)}
-                              onClick={() => setSelectedUtangCustomer(c)}
-                            >
+                            <div key={c._id} style={S.customerOption(selectedUtangCustomer?._id === c._id)} onClick={() => setSelectedUtangCustomer(c)}> {/* ✅ fixed */}
                               <div style={{ flex: 1 }}>
                                 <div style={S.customerOptionName}>{c.customerName}</div>
                                 <div style={S.customerOptionBalance}>
@@ -632,10 +536,8 @@ export default function Checkout() {
                                   {wouldExceed && <span style={{ color: "#ef4444", marginLeft: "6px" }}>⚠ Exceeds limit</span>}
                                 </div>
                               </div>
-                              {selectedUtangCustomer?.id === c.id && (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
+                              {selectedUtangCustomer?._id === c._id && ( // ✅ fixed
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                               )}
                             </div>
                           );
@@ -644,19 +546,10 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Confirm */}
                   <button
-                    style={S.confirmBtn(
-                      loading ||
-                      (paymentMode === "cash" && cashPaid < subtotal) ||
-                      (paymentMode === "utang" && !selectedUtangCustomer)
-                    )}
+                    style={S.confirmBtn(loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer))}
                     onClick={handleConfirm}
-                    disabled={
-                      loading ||
-                      (paymentMode === "cash" && cashPaid < subtotal) ||
-                      (paymentMode === "utang" && !selectedUtangCustomer)
-                    }
+                    disabled={loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer)}
                   >
                     {loading ? "Processing..." : `Confirm ${paymentMode === "cash" ? "Cash" : paymentMode === "gcash" ? "GCash" : "Utang"} Payment`}
                   </button>
@@ -666,34 +559,17 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* ── Success Screen ── */}
         {modal === "success" && successData && (
           <div style={S.successOverlay}>
             <div style={S.successIcon}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
             <div style={S.successTitle}>Sale Complete! 🎉</div>
-            <div style={S.successSub}>
-              {successData.itemCount} item{successData.itemCount !== 1 ? "s" : ""} sold · ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-            </div>
-            {successData.paymentMode === "cash" && successData.change >= 0 && (
-              <div style={S.successChange}>
-                💵 Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-              </div>
-            )}
-            {successData.paymentMode === "utang" && (
-              <div style={S.successChange}>
-                📒 Added to {successData.customerName}'s utang
-              </div>
-            )}
-            {successData.paymentMode === "gcash" && (
-              <div style={S.successChange}>📱 GCash payment received</div>
-            )}
-            <button style={S.newSaleBtn} onClick={resetCheckout}>
-              New Sale
-            </button>
+            <div style={S.successSub}>{successData.itemCount} item{successData.itemCount !== 1 ? "s" : ""} sold · ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+            {successData.paymentMode === "cash" && successData.change >= 0 && <div style={S.successChange}>💵 Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>}
+            {successData.paymentMode === "utang" && <div style={S.successChange}>📒 Added to {successData.customerName}'s utang</div>}
+            {successData.paymentMode === "gcash" && <div style={S.successChange}>📱 GCash payment received</div>}
+            <button style={S.newSaleBtn} onClick={resetCheckout}>New Sale</button>
           </div>
         )}
       </div>

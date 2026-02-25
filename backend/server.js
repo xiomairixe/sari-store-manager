@@ -16,10 +16,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ── Middleware ──
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+}));
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
+
+// ── Uploads folder ──
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+app.use("/uploads", express.static(uploadsDir));
 
 // ── MongoDB Connection ──
 mongoose.connect(process.env.MONGODB_URI)
@@ -28,25 +34,27 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // ── Multer Setup ──
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "./uploads"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.round(Math.random()*1e9)}${path.extname(file.originalname)}`)
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) =>
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`),
 });
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|webp|gif/;
-    const ok = allowed.test(path.extname(file.originalname).toLowerCase()) &&
-               allowed.test(file.mimetype);
+    const ok =
+      allowed.test(path.extname(file.originalname).toLowerCase()) &&
+      allowed.test(file.mimetype);
     ok ? cb(null, true) : cb(new Error("Images only!"));
   },
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// ── Models ──
-import Product from "../sari-store-api/models/product.js";
-import Sale from "../sari-store-api/models/sale.js";
-import Cost from "../sari-store-api/models/cost.js";
-import Utang from "../sari-store-api/models/utang.js";
+// ── Models ── (fixed paths)
+import Product from "./models/product.js";
+import Sale from "./models/sale.js";
+import Cost from "./models/cost.js";
+import Utang from "./models/utang.js";
 
 // ── PRODUCTS ──
 app.get("/products", async (req, res) => {
@@ -77,11 +85,11 @@ app.post("/products", upload.single("image"), async (req, res) => {
 app.put("/products/:id", upload.single("image"), async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.image = req.file.filename;
     if (req.file) {
+      data.image = req.file.filename;
       const old = await Product.findById(req.params.id);
       if (old && old.image && !old.image.startsWith("http")) {
-        const oldPath = path.join(__dirname, "uploads", old.image);
+        const oldPath = path.join(uploadsDir, old.image);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
     }
@@ -94,7 +102,7 @@ app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (product && product.image && !product.image.startsWith("http")) {
-      const filePath = path.join(__dirname, "uploads", product.image);
+      const filePath = path.join(uploadsDir, product.image);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
     await Product.findByIdAndDelete(req.params.id);
@@ -114,10 +122,12 @@ app.post("/sales", async (req, res) => {
   try {
     const { productId, qty, unitPrice, productName, saleDate } = req.body;
     const total = parseFloat(qty) * parseFloat(unitPrice);
-    const sale = new Sale({ productId, productName, qty, unitPrice, total, saleDate: saleDate || new Date() });
+    const sale = new Sale({
+      productId, productName, qty, unitPrice, total,
+      saleDate: saleDate || new Date(),
+    });
     await sale.save();
 
-    // Update stock
     if (productId) {
       const product = await Product.findById(productId);
       if (product) {
@@ -131,18 +141,25 @@ app.post("/sales", async (req, res) => {
 
 // ── COSTS ──
 app.get("/costs", async (req, res) => {
-  try { const costs = await Cost.find().sort({ costDate: -1 }); res.json(costs); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const costs = await Cost.find().sort({ costDate: -1 });
+    res.json(costs);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post("/costs", async (req, res) => {
-  try { const cost = new Cost(req.body); await cost.save(); res.status(201).json(cost); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const cost = new Cost(req.body);
+    await cost.save();
+    res.status(201).json(cost);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete("/costs/:id", async (req, res) => {
-  try { await Cost.findByIdAndDelete(req.params.id); res.json({ message: "Cost deleted" }); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    await Cost.findByIdAndDelete(req.params.id);
+    res.json({ message: "Cost deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── UTANG ──
@@ -178,8 +195,10 @@ app.put("/utang/customers/:id/pay", async (req, res) => {
 });
 
 app.delete("/utang/customers/:id", async (req, res) => {
-  try { await Utang.findByIdAndDelete(req.params.id); res.json({ message: "Customer deleted" }); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    await Utang.findByIdAndDelete(req.params.id);
+    res.json({ message: "Customer deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── START SERVER ──

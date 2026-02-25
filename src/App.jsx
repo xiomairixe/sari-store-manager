@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
-import Expenses from "./pages/Expenses";
 import Sales from "./pages/Sales";
 import Costs from "./pages/Costs";
 import Utang from "./pages/Utang";
@@ -18,7 +17,6 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/sales" element={<Sales />} />
         <Route path="/costs" element={<Costs />} />
-        <Route path="/expenses" element={<Expenses />} />
         <Route path="/utang" element={<Utang />} />
         <Route path="/checkout" element={<Checkout />} />
       </Routes>
