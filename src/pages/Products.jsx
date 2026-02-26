@@ -195,13 +195,37 @@ export default function Products() {
   const inpHL = { ...inp, border:"1.5px solid #f97316", backgroundColor:"#fff8f0" };
   const lbl = { fontSize:"13px", fontWeight:"600", color:"#374151", marginBottom:"6px", display:"block" };
 
+  // ── Navbar height on most mobile browsers is ~64px ──
+  const NAVBAR_H = 64;
+
   return (
     <>
       <style>{`
         @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-        .modal-sheet { display:flex; flex-direction:column; background:#fff; border-radius:24px 24px 0 0; width:100%; height:88vh; overflow:hidden; }
-        .modal-body { flex:1; overflow-y:auto; padding:24px 20px 8px; -webkit-overflow-scrolling:touch; }
-        .modal-footer { flex-shrink:0; padding:12px 20px; padding-bottom:max(20px, env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #f0f0f0; }
+        .modal-sheet {
+          display: flex;
+          flex-direction: column;
+          background: #fff;
+          border-radius: 24px 24px 0 0;
+          width: 100%;
+          /* Stop the sheet exactly at the top of the navbar */
+          height: calc(100vh - ${NAVBAR_H}px);
+          max-height: calc(100vh - ${NAVBAR_H}px);
+          overflow: hidden;
+        }
+        .modal-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 24px 20px 8px;
+          -webkit-overflow-scrolling: touch;
+        }
+        .modal-footer {
+          flex-shrink: 0;
+          padding: 12px 20px 20px;
+          background: #fff;
+          border-top: 1px solid #f0f0f0;
+          box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+        }
       `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <Toast toasts={toasts} />
@@ -309,7 +333,6 @@ export default function Products() {
           <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.45)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
             <div className="modal-sheet">
 
-              {/* Scrollable body */}
               <div className="modal-body">
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
                   <h2 style={{ fontSize:"20px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>{editId ? "Edit Product" : "Add New Product"}</h2>
@@ -330,22 +353,18 @@ export default function Products() {
                     <input ref={fileInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleImageChange} />
                   </div>
 
-                  {/* Name */}
                   <div style={{ marginBottom:"14px" }}>
                     <label style={lbl}>Product Name</label>
                     <input style={inp} name="name" value={form.name} onChange={handleChange} placeholder="e.g. Lucky Me Pancit Canton" />
                   </div>
 
-                  {/* Category + Unit */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"14px" }}>
-                    <div>
-                      <label style={lbl}>Category</label>
+                    <div><label style={lbl}>Category</label>
                       <select style={inp} name="category" value={form.category} onChange={handleChange}>
                         {CATEGORIES.filter(c => c !== "All").map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label style={lbl}>Unit Bought</label>
+                    <div><label style={lbl}>Unit Bought</label>
                       <select style={inp} name="unit" value={form.unit} onChange={handleChange}>
                         {UNITS.map(u => <option key={u}>{u}</option>)}
                       </select>
@@ -361,11 +380,10 @@ export default function Products() {
 
                   {isBulkUnit && (
                     <div style={{ backgroundColor:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:"10px", padding:"10px 14px", fontSize:"12px", color:"#1e40af", marginBottom:"14px", lineHeight:"1.5" }}>
-                      💡 You selected <strong>{form.unit}</strong> — selling price computed <strong>per piece</strong>, rounded up. Enter how many pieces per {form.unit}.
+                      💡 You selected <strong>{form.unit}</strong> — selling price computed <strong>per piece</strong>, rounded up to the nearest peso.
                     </div>
                   )}
 
-                  {/* Cost / Markup / pcsPerUnit */}
                   {isBulkUnit ? (
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"10px", marginBottom:"14px" }}>
                       <div><label style={lbl}>Cost / {form.unit}</label><input style={inp} type="number" name="cost" value={form.cost} onChange={handleChange} placeholder="0.00" step="0.01" /></div>
@@ -379,11 +397,15 @@ export default function Products() {
                     </div>
                   )}
 
-                  {/* Selling Price Preview */}
                   {isBulkUnit ? (
                     <div style={{ backgroundColor:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:"12px", padding:"14px", marginBottom:"14px" }}>
                       <div style={{ fontSize:"12px", fontWeight:"700", color:"#16a34a", marginBottom:"10px" }}>🧮 Per-Piece Breakdown</div>
-                      {[["Cost per "+form.unit, "₱"+(parseFloat(form.cost||0).toFixed(2))],["Pcs per "+form.unit, form.pcsPerUnit||"—"],["Cost per piece","₱"+(form.pcsPerUnit?costPerPc():"—")],["Markup",form.markup+"%"]].map(([k,v]) => (
+                      {[
+                        ["Cost per "+form.unit, "₱"+(parseFloat(form.cost||0).toFixed(2))],
+                        ["Pcs per "+form.unit, form.pcsPerUnit||"—"],
+                        ["Cost per piece","₱"+(form.pcsPerUnit?costPerPc():"—")],
+                        ["Markup", form.markup+"%"],
+                      ].map(([k,v]) => (
                         <div key={k} style={{ display:"flex", justifyContent:"space-between", fontSize:"13px", color:"#374151", marginBottom:"6px" }}><span>{k}</span><span>{v}</span></div>
                       ))}
                       <div style={{ display:"flex", justifyContent:"space-between", fontSize:"14px", fontWeight:"700", color:"#16a34a", borderTop:"1px solid #bbf7d0", paddingTop:"8px", marginTop:"4px" }}>
@@ -401,18 +423,17 @@ export default function Products() {
                     </div>
                   )}
 
-                  {/* Stock + Reorder */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"14px" }}>
                     <div><label style={lbl}>Stock ({isBulkUnit?form.unit+"s":"pcs"})</label><input style={inp} type="number" name="stock" value={form.stock} onChange={handleChange} placeholder="0" /></div>
                     <div><label style={lbl}>Reorder Level</label><input style={inp} type="number" name="reorder" value={form.reorder} onChange={handleChange} /></div>
                   </div>
 
                   <div style={{ marginBottom:"14px" }}><label style={lbl}>Expiry Date</label><input style={inp} type="date" name="expiry" value={form.expiry} onChange={handleChange} /></div>
-                  <div style={{ marginBottom:"4px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
+                  <div style={{ marginBottom:"8px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
                 </form>
               </div>
 
-              {/* ── STICKY FOOTER BUTTON — always visible ── */}
+              {/* ── PINNED FOOTER — always above navbar ── */}
               <div className="modal-footer">
                 <button type="submit" form="pform" disabled={submitting}
                   style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
