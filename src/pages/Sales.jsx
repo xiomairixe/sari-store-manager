@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// ── Daily targets stored in localStorage (no backend changes needed) ──
+const TARGETS_KEY = "sari_daily_targets";
+const loadTargets = () => { try { return JSON.parse(localStorage.getItem(TARGETS_KEY) || "{}"); } catch { return {}; } };
+const saveTargets = (t) => localStorage.setItem(TARGETS_KEY, JSON.stringify(t));
 
 const S = {
   page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
@@ -20,14 +25,11 @@ const S = {
   slowItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f3f4f6" },
   slowName: { fontSize: "14px", color: "#374151" },
   slowStock: { fontSize: "12px", color: "#9ca3af" },
-  recordItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #f3f4f6", cursor: "pointer" },
-  recordDate: { fontSize: "15px", fontWeight: "600", color: "#1a1a2e" },
-  recordSub: { fontSize: "12px", color: "#9ca3af", marginTop: "2px" },
-  recordAmount: { fontSize: "16px", fontWeight: "700", color: "#f97316" },
-  recordRight: { display: "flex", alignItems: "center", gap: "10px" },
   fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#f97316", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(249,115,22,0.4)", zIndex: 100 },
   overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 40px", maxHeight: "90vh", overflowY: "auto" },
+  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" },
+  modalScrollArea: { padding: "24px 20px 8px", overflowY: "auto", flex: 1, minHeight: 0 },
+  submitBtnWrap: { padding: "12px 20px 90px", backgroundColor: "#fff", borderTop: "1px solid #f3f4f6", flexShrink: 0 },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" },
   modalTitle: { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   modalSub: { fontSize: "13px", color: "#9ca3af", marginBottom: "20px" },
@@ -35,7 +37,7 @@ const S = {
   label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
   input: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" },
   textarea: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", minHeight: "90px", resize: "vertical", marginBottom: "14px" },
-  submitBtn: { width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  submitBtn: { width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   emptyText: { textAlign: "center", color: "#9ca3af", padding: "20px 0", fontSize: "13px" },
   reviewSummaryBox: { background: "linear-gradient(135deg, #fff8f0 0%, #fff 100%)", border: "1.5px solid #fed7aa", borderRadius: "14px", padding: "16px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" },
   reviewSummaryLabel: { fontSize: "12px", color: "#f97316", fontWeight: "600", marginBottom: "4px" },
@@ -51,7 +53,6 @@ const S = {
 };
 
 const TABS = ["Daily", "Weekly", "Monthly"];
-
 const formatDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 const formatTime = (d) => new Date(d).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true });
 const formatChartDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
@@ -68,6 +69,100 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+// ── Single Record Row: shows actual vs expected + progress bar ──
+function RecordRow({ r, target, onSetTarget, onReview }) {
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState(target ? String(target) : "");
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  const hasTarget = target > 0;
+  const pct = hasTarget ? Math.min((r.total / target) * 100, 100) : 0;
+  const met = hasTarget && r.total >= target;
+  const barColor = met ? "#16a34a" : pct >= 70 ? "#f97316" : "#ef4444";
+
+  const commit = () => {
+    const val = parseFloat(inputVal);
+    onSetTarget(r.date, isNaN(val) || val <= 0 ? 0 : val);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{ padding: "14px 0", borderBottom: "1px solid #f3f4f6" }}>
+
+      {/* ── Row 1: date + actual ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+        <div style={{ cursor: "pointer", flex: 1 }} onClick={onReview}>
+          <div style={{ fontSize: "15px", fontWeight: "600", color: "#1a1a2e" }}>{formatDate(r.date)}</div>
+          <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{r.count} transaction{r.count !== 1 ? "s" : ""}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "16px", fontWeight: "700", color: "#f97316" }}>
+              ₱{r.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: "11px", color: "#9ca3af" }}>actual</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ cursor: "pointer", flexShrink: 0 }} onClick={onReview}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </div>
+
+      {/* ── Row 2: expected label + value/input ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: hasTarget ? "8px" : "0" }}>
+        <span style={{ fontSize: "12px", color: "#9ca3af", flexShrink: 0 }}>Expected:</span>
+
+        {editing ? (
+          <>
+            <span style={{ fontSize: "12px", color: "#9ca3af" }}>₱</span>
+            <input
+              ref={inputRef}
+              type="number"
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onBlur={commit}
+              onKeyDown={e => e.key === "Enter" && commit()}
+              placeholder="e.g. 500"
+              style={{ width: "110px", border: "1.5px solid #f97316", borderRadius: "8px", padding: "4px 8px", fontSize: "13px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: "#1a1a2e" }}
+            />
+            <button onClick={commit} style={{ padding: "4px 12px", backgroundColor: "#f97316", border: "none", borderRadius: "8px", color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>✓</button>
+          </>
+        ) : hasTarget ? (
+          <>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>
+              ₱{target.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </span>
+            <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "99px", backgroundColor: met ? "#f0fdf4" : "#fff1f2", color: met ? "#16a34a" : "#ef4444", flexShrink: 0 }}>
+              {met ? "✓ MET" : `₱${(target - r.total).toLocaleString("en-PH", { minimumFractionDigits: 0 })} short`}
+            </span>
+            <button
+              onClick={() => { setInputVal(String(target)); setEditing(true); }}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#9ca3af", padding: "2px 4px", lineHeight: 1 }}
+              title="Edit target"
+            >✏️</button>
+          </>
+        ) : (
+          <button
+            onClick={() => { setInputVal(""); setEditing(true); }}
+            style={{ fontSize: "12px", color: "#f97316", background: "none", border: "1px dashed #fed7aa", borderRadius: "8px", padding: "3px 10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: "600" }}
+          >
+            + Set target
+          </button>
+        )}
+      </div>
+
+      {/* ── Row 3: progress bar (only when target set) ── */}
+      {hasTarget && (
+        <div style={{ height: "6px", backgroundColor: "#f3f4f6", borderRadius: "99px", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${pct}%`, borderRadius: "99px", backgroundColor: barColor, transition: "width 0.4s ease" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sales() {
   const [activeTab, setActiveTab] = useState("Daily");
   const [sales, setSales] = useState([]);
@@ -75,22 +170,31 @@ export default function Sales() {
   const [showModal, setShowModal] = useState(false);
   const [reviewDate, setReviewDate] = useState(null);
   const [form, setForm] = useState({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
+  const [targets, setTargets] = useState(loadTargets);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchSales(); fetchProducts(); }, []);
 
   const fetchSales = async () => {
     try { const res = await axios.get(`${BASE_URL}/sales`); setSales(res.data); }
-    catch (err) { console.error("Error fetching sales:", err); }
+    catch (err) { console.error(err); }
   };
 
   const fetchProducts = async () => {
     try { const res = await axios.get(`${BASE_URL}/products`); setProducts(res.data); }
-    catch (err) { console.error("Error fetching products:", err); }
+    catch (err) { console.error(err); }
+  };
+
+  const handleSetTarget = (date, val) => {
+    const updated = { ...targets, [date]: val };
+    setTargets(updated);
+    saveTargets(updated);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.amount || parseFloat(form.amount) <= 0) { alert("Please enter a valid amount."); return; }
+    if (!form.amount || parseFloat(form.amount) <= 0) return;
+    setSubmitting(true);
     try {
       await axios.post(`${BASE_URL}/sales`, {
         productId: null,
@@ -104,19 +208,18 @@ export default function Sales() {
       setShowModal(false);
       setForm({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
       fetchSales();
-    } catch (err) { console.error("Error saving sale:", err); }
+    } catch (err) { console.error(err); }
+    finally { setSubmitting(false); }
   };
 
   const now = new Date();
 
-  const filterSales = (tab) => {
-    return sales.filter((s) => {
-      const d = new Date(s.saleDate);
-      if (tab === "Daily") return d.toDateString() === now.toDateString();
-      if (tab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    });
-  };
+  const filterSales = (tab) => sales.filter((s) => {
+    const d = new Date(s.saleDate);
+    if (tab === "Daily") return d.toDateString() === now.toDateString();
+    if (tab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
 
   const filtered = filterSales(activeTab);
   const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
@@ -157,9 +260,11 @@ export default function Sales() {
   const reviewSales = reviewDate
     ? sales.filter(s => new Date(s.saleDate).toISOString().split("T")[0] === reviewDate).sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
     : [];
-
   const reviewTotal = reviewSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const getTxnType = (s) => (s.productId && s.productId !== "null" ? "checkout" : "manual");
+
+  const targetedDays = recentByDate.filter(r => targets[r.date] > 0);
+  const metDays = targetedDays.filter(r => r.total >= targets[r.date]);
 
   return (
     <>
@@ -203,7 +308,7 @@ export default function Sales() {
             <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 10px" }}>Consider running a promotion for these items.</p>
             {slowMoving.length === 0 ? <div style={S.emptyText}>No products found.</div> : (
               slowMoving.map((p) => (
-                <div key={p._id} style={S.slowItem}> {/* ✅ fixed */}
+                <div key={p._id} style={S.slowItem}>
                   <span style={S.slowName}>{p.name}</span>
                   <span style={S.slowStock}>{p.stock} in stock</span>
                 </div>
@@ -211,20 +316,30 @@ export default function Sales() {
             )}
           </div>
 
+          {/* ── Recent Records with Expected vs Actual ── */}
           <div style={S.card}>
-            <div style={S.cardTitle}>Recent Records</div>
-            {recentByDate.length === 0 ? <div style={S.emptyText}>No sales recorded yet. Tap + to add.</div> : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Recent Records</div>
+              {targetedDays.length > 0 && (
+                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "99px", backgroundColor: metDays.length === targetedDays.length ? "#f0fdf4" : "#fff8f0", color: metDays.length === targetedDays.length ? "#16a34a" : "#f97316" }}>
+                  {metDays.length}/{targetedDays.length} targets met
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>
+              Tap a row to review transactions · Tap "+ Set target" to track your daily goal
+            </div>
+            {recentByDate.length === 0 ? (
+              <div style={S.emptyText}>No sales recorded yet. Tap + to add.</div>
+            ) : (
               recentByDate.map((r) => (
-                <div key={r.date} style={S.recordItem} onClick={() => setReviewDate(r.date)}>
-                  <div>
-                    <div style={S.recordDate}>{formatDate(r.date)}</div>
-                    <div style={S.recordSub}>{r.count} transaction{r.count !== 1 ? "s" : ""}</div>
-                  </div>
-                  <div style={S.recordRight}>
-                    <div style={S.recordAmount}>₱{parseFloat(r.total).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-                  </div>
-                </div>
+                <RecordRow
+                  key={r.date}
+                  r={r}
+                  target={targets[r.date] || 0}
+                  onSetTarget={handleSetTarget}
+                  onReview={() => setReviewDate(r.date)}
+                />
               ))
             )}
           </div>
@@ -232,62 +347,109 @@ export default function Sales() {
 
         <button style={S.fab} onClick={() => setShowModal(true)}>+</button>
 
+        {/* ── Record Sales Modal ── */}
         {showModal && (
           <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
             <div style={S.modal}>
-              <div style={S.modalHeader}>
-                <h2 style={S.modalTitle}>Record Daily Sales</h2>
-                <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
+              <div style={S.modalScrollArea}>
+                <div style={S.modalHeader}>
+                  <h2 style={S.modalTitle}>Record Daily Sales</h2>
+                  <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
+                </div>
+                <form id="sales-form" onSubmit={handleSubmit}>
+                  <label style={S.label}>Date</label>
+                  <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                  <label style={S.label}>Total Amount</label>
+                  <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                  <label style={S.label}>Notes</label>
+                  <textarea style={{ ...S.textarea, marginBottom: "4px" }} placeholder="Optional notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                </form>
               </div>
-              <form onSubmit={handleSubmit}>
-                <label style={S.label}>Date</label>
-                <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                <label style={S.label}>Total Amount</label>
-                <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                <label style={S.label}>Notes</label>
-                <textarea style={S.textarea} placeholder="Optional notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                <button type="submit" style={S.submitBtn}>Save Record</button>
-              </form>
+              <div style={S.submitBtnWrap}>
+                <button type="submit" form="sales-form" style={S.submitBtn} disabled={submitting}>
+                  {submitting ? "Saving..." : "💾 Save Record"}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
+        {/* ── Review Modal ── */}
         {reviewDate && (
           <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setReviewDate(null)}>
             <div style={S.modal}>
-              <div style={S.modalHeader}>
-                <h2 style={S.modalTitle}>Sales Review</h2>
-                <button style={S.closeBtn} onClick={() => setReviewDate(null)}>✕</button>
-              </div>
-              <div style={S.modalSub}>{formatDate(reviewDate)}</div>
-              <div style={S.reviewSummaryBox}>
-                <div>
-                  <div style={S.reviewSummaryLabel}>TOTAL REVENUE</div>
-                  <div style={S.reviewSummaryTotal}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                  <div style={S.reviewSummaryCount}>{reviewSales.length} transaction{reviewSales.length !== 1 ? "s" : ""}</div>
+              <div style={S.modalScrollArea}>
+                <div style={S.modalHeader}>
+                  <h2 style={S.modalTitle}>Sales Review</h2>
+                  <button style={S.closeBtn} onClick={() => setReviewDate(null)}>✕</button>
                 </div>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fed7aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
-              </div>
-              {reviewSales.length === 0 ? <div style={S.emptyText}>No transactions found.</div> : (
-                reviewSales.map((s) => {
-                  const type = getTxnType(s);
-                  const qty = parseInt(s.qty) || 1;
-                  const unitPrice = parseFloat(s.unitPrice) || 0;
-                  const total = parseFloat(s.total || unitPrice * qty);
+                <div style={S.modalSub}>{formatDate(reviewDate)}</div>
+
+                {/* Expected vs Actual summary inside review modal */}
+                {targets[reviewDate] > 0 && (() => {
+                  const t = targets[reviewDate];
+                  const hit = reviewTotal >= t;
+                  const pct2 = Math.min((reviewTotal / t) * 100, 100);
                   return (
-                    <div key={s._id} style={S.txnItem}> {/* ✅ fixed */}
-                      <div style={S.txnLeft}>
-                        <div style={S.txnName}>{s.productName || "Manual Entry"}</div>
-                        <div style={S.txnMeta}>{formatTime(s.saleDate)}{qty > 1 && ` · qty ${qty}`}{unitPrice > 0 && ` · ₱${unitPrice.toFixed(2)}/ea`}</div>
-                        <div style={S.typeBadge(type)}>{type === "checkout" ? "✓ Checkout" : "Manual"}</div>
+                    <div style={{ backgroundColor: hit ? "#f0fdf4" : "#fff1f2", border: `1.5px solid ${hit ? "#86efac" : "#fecaca"}`, borderRadius: "14px", padding: "16px", marginBottom: "16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+                        <div>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>Actual</div>
+                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#1a1a2e" }}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>Expected</div>
+                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#9ca3af" }}>₱{t.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                        </div>
                       </div>
-                      <div style={S.txnRight}>
-                        <div style={S.txnTotal}>₱{total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                      <div style={{ height: "8px", backgroundColor: "#e5e7eb", borderRadius: "99px", overflow: "hidden", marginBottom: "10px" }}>
+                        <div style={{ height: "100%", width: `${pct2}%`, borderRadius: "99px", backgroundColor: hit ? "#16a34a" : pct2 >= 70 ? "#f97316" : "#ef4444", transition: "width 0.4s ease" }} />
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", textAlign: "center", color: hit ? "#16a34a" : "#ef4444" }}>
+                        {hit
+                          ? `🎉 Target met! +₱${(reviewTotal - t).toLocaleString("en-PH", { minimumFractionDigits: 2 })} over`
+                          : `₱${(t - reviewTotal).toLocaleString("en-PH", { minimumFractionDigits: 2 })} short of target`}
                       </div>
                     </div>
                   );
-                })
-              )}
+                })()}
+
+                <div style={S.reviewSummaryBox}>
+                  <div>
+                    <div style={S.reviewSummaryLabel}>TOTAL REVENUE</div>
+                    <div style={S.reviewSummaryTotal}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                    <div style={S.reviewSummaryCount}>{reviewSales.length} transaction{reviewSales.length !== 1 ? "s" : ""}</div>
+                  </div>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fed7aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
+                </div>
+
+                {reviewSales.length === 0 ? <div style={S.emptyText}>No transactions found.</div> : (
+                  reviewSales.map((s) => {
+                    const type = getTxnType(s);
+                    const qty = parseInt(s.qty) || 1;
+                    const unitPrice = parseFloat(s.unitPrice) || 0;
+                    const txnTotal = parseFloat(s.total || unitPrice * qty);
+                    return (
+                      <div key={s._id} style={S.txnItem}>
+                        <div style={S.txnLeft}>
+                          <div style={S.txnName}>{s.productName || "Manual Entry"}</div>
+                          <div style={S.txnMeta}>{formatTime(s.saleDate)}{qty > 1 && ` · qty ${qty}`}{unitPrice > 0 && ` · ₱${unitPrice.toFixed(2)}/ea`}</div>
+                          <div style={S.typeBadge(type)}>{type === "checkout" ? "✓ Checkout" : "Manual"}</div>
+                        </div>
+                        <div style={S.txnRight}>
+                          <div style={S.txnTotal}>₱{txnTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div style={S.submitBtnWrap}>
+                <button style={{ ...S.submitBtn, backgroundColor: "#1a1a2e" }} onClick={() => setReviewDate(null)}>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -41,14 +41,19 @@ const S = {
   sectionTitle: { fontSize: "16px", fontWeight: "700", color: "#1a1a2e", margin: "4px 0 10px" },
   fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#ef4444", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(239,68,68,0.4)", zIndex: 100 },
   overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 40px", maxHeight: "90vh", overflowY: "auto" },
+  // ── KEY: flex column so button sticks to bottom ──
+  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" },
+  // ── scrollable form area ──
+  modalScrollArea: { padding: "24px 20px 8px", overflowY: "auto", flex: 1, minHeight: 0 },
+  // ── sticky button — outside scroll, clears nav bar ──
+  submitBtnWrap: { padding: "12px 20px 90px", backgroundColor: "#fff", borderTop: "1px solid #f3f4f6", flexShrink: 0 },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
   modalTitle: { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
   label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
   input: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" },
   row2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "0" },
-  submitBtn: { width: "100%", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: "8px" },
+  submitBtn: { width: "100%", backgroundColor: "#ef4444", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   emptyText: { textAlign: "center", color: "#9ca3af", padding: "20px 0", fontSize: "13px" },
   deleteBtn: { background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "16px", padding: "4px", flexShrink: 0 },
 };
@@ -80,6 +85,8 @@ export default function Costs() {
   const [sales, setSales] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchCosts(); fetchSales(); }, []);
 
@@ -95,20 +102,22 @@ export default function Costs() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.description || !form.amount) { alert("Please fill all required fields."); return; }
+    if (!form.description || !form.amount) return;
+    setSubmitting(true);
     try {
       await axios.post(`${BASE_URL}/costs`, form);
       setShowModal(false);
       setForm(emptyForm);
       fetchCosts();
     } catch (err) { console.error(err); }
+    finally { setSubmitting(false); }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this expense?")) {
-      try { await axios.delete(`${BASE_URL}/costs/${id}`); fetchCosts(); }
-      catch (err) { console.error(err); }
-    }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try { await axios.delete(`${BASE_URL}/costs/${deleteTarget}`); fetchCosts(); }
+    catch (err) { console.error(err); }
+    finally { setDeleteTarget(null); }
   };
 
   const now = new Date();
@@ -177,7 +186,7 @@ export default function Costs() {
               recent.map((cost) => {
                 const color = CATEGORY_COLORS[cost.category] || "#9ca3af";
                 return (
-                  <div key={cost._id} style={S.expenseItem}> {/* ✅ fixed */}
+                  <div key={cost._id} style={S.expenseItem}>
                     <div style={S.iconBox(color)}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
@@ -191,7 +200,7 @@ export default function Costs() {
                       <div style={S.expenseAmount}>₱{parseFloat(cost.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
                       <div style={S.expenseDate}>{formatDate(cost.costDate)}</div>
                     </div>
-                    <button style={S.deleteBtn} onClick={() => handleDelete(cost._id)}>🗑</button> {/* ✅ fixed */}
+                    <button style={S.deleteBtn} onClick={() => setDeleteTarget(cost._id)}>🗑</button>
                   </div>
                 );
               })
@@ -201,32 +210,86 @@ export default function Costs() {
 
         <button style={S.fab} onClick={() => setShowModal(true)}>+</button>
 
+        {/* ── Delete Confirm Modal ── */}
+        {deleteTarget && (
+          <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+            <div style={{ backgroundColor: "#fff", borderRadius: "20px", padding: "28px 20px", width: "100%", maxWidth: "320px", textAlign: "center", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+              <div style={{ fontSize: "44px", marginBottom: "12px" }}>🗑️</div>
+              <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px" }}>Delete Expense?</div>
+              <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "24px" }}>This action cannot be undone.</div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", fontSize: "14px", fontWeight: "600", color: "#374151", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                >Cancel</button>
+                <button
+                  onClick={handleDelete}
+                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "none", backgroundColor: "#ef4444", fontSize: "14px", fontWeight: "700", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                >Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Add Expense Modal ── */}
         {showModal && (
           <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
             <div style={S.modal}>
-              <div style={S.modalHeader}>
-                <h2 style={S.modalTitle}>Add Expense</h2>
-                <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
-              </div>
-              <form onSubmit={handleSubmit}>
-                <label style={S.label}>Description</label>
-                <input style={S.input} placeholder="e.g. Meralco Bill" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-                <div style={S.row2}>
-                  <div>
-                    <label style={S.label}>Amount</label>
-                    <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={S.label}>Category</label>
-                    <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
+
+              {/* scrollable form */}
+              <div style={S.modalScrollArea}>
+                <div style={S.modalHeader}>
+                  <h2 style={S.modalTitle}>Add Expense</h2>
+                  <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
                 </div>
-                <label style={S.label}>Date</label>
-                <input style={S.input} type="date" value={form.costDate} onChange={(e) => setForm({ ...form, costDate: e.target.value })} />
-                <button type="submit" style={S.submitBtn}>Save Expense</button>
-              </form>
+
+                <form id="expense-form" onSubmit={handleSubmit}>
+                  <label style={S.label}>Description</label>
+                  <input
+                    style={S.input}
+                    placeholder="e.g. Meralco Bill"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  />
+                  <div style={S.row2}>
+                    <div>
+                      <label style={S.label}>Amount</label>
+                      <input
+                        style={S.input}
+                        type="number" step="0.01" placeholder="0.00"
+                        value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={S.label}>Category</label>
+                      <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                        {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <label style={S.label}>Date</label>
+                  <input
+                    style={{ ...S.input, marginBottom: "4px" }}
+                    type="date"
+                    value={form.costDate}
+                    onChange={(e) => setForm({ ...form, costDate: e.target.value })}
+                  />
+                </form>
+              </div>
+
+              {/* ── Sticky button — OUTSIDE scroll, above nav bar ── */}
+              <div style={S.submitBtnWrap}>
+                <button
+                  type="submit"
+                  form="expense-form"
+                  style={S.submitBtn}
+                  disabled={submitting}
+                >
+                  {submitting ? "Saving..." : "💾 Save Expense"}
+                </button>
+              </div>
+
             </div>
           </div>
         )}

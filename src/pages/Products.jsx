@@ -203,28 +203,13 @@ export default function Products() {
       <style>{`
         @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
         .modal-sheet {
-          display: flex;
-          flex-direction: column;
           background: #fff;
           border-radius: 24px 24px 0 0;
           width: 100%;
-          /* Stop the sheet exactly at the top of the navbar */
-          height: calc(100vh - ${NAVBAR_H}px);
           max-height: calc(100vh - ${NAVBAR_H}px);
-          overflow: hidden;
-        }
-        .modal-body {
-          flex: 1;
           overflow-y: auto;
-          padding: 24px 20px 8px;
           -webkit-overflow-scrolling: touch;
-        }
-        .modal-footer {
-          flex-shrink: 0;
-          padding: 12px 20px 20px;
-          background: #fff;
-          border-top: 1px solid #f0f0f0;
-          box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+          padding: 24px 20px 0;
         }
       `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -333,8 +318,7 @@ export default function Products() {
           <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.45)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
             <div className="modal-sheet">
 
-              <div className="modal-body">
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
                   <h2 style={{ fontSize:"20px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>{editId ? "Edit Product" : "Add New Product"}</h2>
                   <button style={{ background:"none", border:"none", fontSize:"22px", color:"#9ca3af", cursor:"pointer" }} onClick={() => setShowModal(false)}>✕</button>
                 </div>
@@ -342,7 +326,7 @@ export default function Products() {
                 <form id="pform" onSubmit={handleSubmit}>
                   {/* Image */}
                   <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"18px" }}>
-                    <div onClick={() => fileInputRef.current.click()} style={{ width:"88px", height:"88px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
+                    <div onClick={() => fileInputRef.current.click()} style={{ width:"70px", height:"70px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
                       {imagePreview ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>}
                     </div>
                     <div style={{ flex:1 }}>
@@ -430,16 +414,13 @@ export default function Products() {
 
                   <div style={{ marginBottom:"14px" }}><label style={lbl}>Expiry Date</label><input style={inp} type="date" name="expiry" value={form.expiry} onChange={handleChange} /></div>
                   <div style={{ marginBottom:"8px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
-                </form>
-              </div>
 
-              {/* ── PINNED FOOTER — always above navbar ── */}
-              <div className="modal-footer">
-                <button type="submit" form="pform" disabled={submitting}
-                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
-                  {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
-                </button>
-              </div>
+                  {/* ── SUBMIT BUTTON inside form — scrolls into view, never hidden ── */}
+                  <button type="submit" disabled={submitting}
+                    style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1, marginTop:"8px", marginBottom:"32px" }}>
+                    {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
+                  </button>
+                </form>
 
             </div>
           </div>
