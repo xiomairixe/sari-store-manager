@@ -18,7 +18,6 @@ const CATEGORIES = [
   "School & Office Supplies", "General Merchandise", "Other",
 ];
 
-// ── Price is always per PIECE — ceil to next whole peso ──
 const getSellingPrice = (p) => {
   const cost = parseFloat(p.cost) || 0;
   const markup = parseFloat(p.markup) || 0;
@@ -27,6 +26,50 @@ const getSellingPrice = (p) => {
   }
   return Math.ceil(cost * (1 + markup / 100));
 };
+
+// ── Toast notification ──
+function Toast({ toast, onClose }) {
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(onClose, 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
+  if (!toast) return null;
+  const isSuccess = toast.type === "success";
+  return (
+    <>
+      <style>{`@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
+      <div style={{
+        position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)",
+        zIndex: 9999, backgroundColor: isSuccess ? "#1a1a2e" : "#fff",
+        borderRadius: "16px", padding: "14px 18px",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+        display: "flex", alignItems: "center", gap: "12px",
+        minWidth: "260px", maxWidth: "320px",
+        animation: "slideDown 0.25s ease",
+      }}>
+        <div style={{
+          width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
+          backgroundColor: isSuccess ? "#f97316" : "#fee2e2",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "16px", fontWeight: "700", color: isSuccess ? "#fff" : "#ef4444",
+        }}>
+          {isSuccess ? "✓" : "✕"}
+        </div>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: isSuccess ? "#fff" : "#ef4444" }}>
+            {toast.title}
+          </div>
+          {toast.subtitle && (
+            <div style={{ fontSize: "12px", color: isSuccess ? "rgba(255,255,255,0.6)" : "#9ca3af", marginTop: "2px" }}>
+              {toast.subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
 
 const S = {
   page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "180px" },
@@ -78,7 +121,8 @@ const S = {
   cartBarTotal: { fontSize: "22px", fontWeight: "700", color: "#fff" },
   viewCartBtn: { width: "100%", padding: "14px", backgroundColor: "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "space-between" },
   overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "24px 20px 40px" },
+  // ── modal NO bottom padding — sticky bar handles it ──
+  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "24px 20px 0" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
   modalTitle: { fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
@@ -102,12 +146,34 @@ const S = {
   changeBox: { backgroundColor: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" },
   changeLabel: { fontSize: "13px", color: "#16a34a", fontWeight: "600" },
   changeAmt: { fontSize: "20px", fontWeight: "700", color: "#16a34a" },
-  confirmBtn: (disabled) => ({ width: "100%", padding: "15px", backgroundColor: disabled ? "#d1d5db" : "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: disabled ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: "4px" }),
+  // ── sticky confirm bar ──
+  stickyBar: {
+    position: "sticky", bottom: 0,
+    backgroundColor: "#fff",
+    borderTop: "1px solid #f3f4f6",
+    padding: "14px 0 32px",
+    marginTop: "8px",
+  },
+  confirmBtn: (disabled) => ({
+    width: "100%", padding: "15px",
+    backgroundColor: disabled ? "#d1d5db" : "#f97316",
+    border: "none", borderRadius: "14px", color: "#fff",
+    fontSize: "16px", fontWeight: "700",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  }),
   successOverlay: { position: "fixed", inset: 0, backgroundColor: "#fff", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: "'DM Sans', sans-serif" },
   successIcon: { width: "80px", height: "80px", borderRadius: "50%", backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" },
   successTitle: { fontSize: "26px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px", textAlign: "center" },
-  successSub: { fontSize: "15px", color: "#9ca3af", marginBottom: "32px", textAlign: "center" },
-  successChange: { fontSize: "16px", fontWeight: "600", color: "#16a34a", marginBottom: "32px" },
+  successSub: { fontSize: "15px", color: "#9ca3af", marginBottom: "16px", textAlign: "center" },
+  successBadge: (color) => ({
+    backgroundColor: color === "green" ? "#f0fdf4" : color === "blue" ? "#eff6ff" : "#fff8f0",
+    border: `1.5px solid ${color === "green" ? "#86efac" : color === "blue" ? "#bfdbfe" : "#fed7aa"}`,
+    borderRadius: "12px", padding: "12px 20px",
+    fontSize: "15px", fontWeight: "600",
+    color: color === "green" ? "#16a34a" : color === "blue" ? "#1d4ed8" : "#f97316",
+    marginBottom: "28px", textAlign: "center",
+  }),
   newSaleBtn: { width: "100%", maxWidth: "320px", padding: "15px", backgroundColor: "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   emptyCart: { textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: "14px" },
   customerOption: (active) => ({ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "12px", border: `1.5px solid ${active ? "#f97316" : "#e5e7eb"}`, backgroundColor: active ? "#fff8f0" : "#fff", marginBottom: "8px", cursor: "pointer" }),
@@ -138,9 +204,11 @@ export default function Checkout() {
   const [selectedUtangCustomer, setSelectedUtangCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState(null);
-
+  const [toast, setToast] = useState(null);
   const [pickerProduct, setPickerProduct] = useState(null);
   const [pickerQty, setPickerQty] = useState(1);
+
+  const showToast = (type, title, subtitle) => setToast({ type, title, subtitle });
 
   useEffect(() => { fetchProducts(); fetchUtangCustomers(); }, []);
 
@@ -198,9 +266,9 @@ export default function Checkout() {
 
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
-  const subtotal  = cartItems.reduce((sum, i) => sum + getSellingPrice(i.product) * i.qty, 0);
-  const cashPaid  = parseFloat(cashInput) || 0;
-  const change    = cashPaid - subtotal;
+  const subtotal = cartItems.reduce((sum, i) => sum + getSellingPrice(i.product) * i.qty, 0);
+  const cashPaid = parseFloat(cashInput) || 0;
+  const change = cashPaid - subtotal;
 
   const handleConfirm = async () => {
     if (cartItems.length === 0) return;
@@ -224,20 +292,15 @@ export default function Checkout() {
         });
       }
       setSuccessData({
-        total: subtotal,
-        change: paymentMode === "cash" ? change : 0,
-        paymentMode,
-        customerName: selectedUtangCustomer?.customerName || null,
-        itemCount: cartCount,
+        total: subtotal, change: paymentMode === "cash" ? change : 0,
+        paymentMode, customerName: selectedUtangCustomer?.customerName || null, itemCount: cartCount,
       });
       setModal("success");
-      setCart({});
-      setCashInput("");
-      setSelectedUtangCustomer(null);
+      setCart({}); setCashInput(""); setSelectedUtangCustomer(null);
       fetchProducts();
     } catch (err) {
       console.error(err);
-      alert("Failed to complete checkout. Please try again.");
+      showToast("error", "Checkout Failed", "Something went wrong. Please try again.");
     } finally { setLoading(false); }
   };
 
@@ -251,8 +314,9 @@ export default function Checkout() {
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={S.page}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
+      <div style={S.page}>
         {/* Header */}
         <div style={S.header}>
           <div style={S.headerTop}><h1 style={S.title}>Checkout</h1></div>
@@ -284,7 +348,6 @@ export default function Checkout() {
             const inCart = !!cartItem;
             const outOfStock = parseInt(product.stock) <= 0;
             const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
-
             return (
               <div key={product._id} style={S.productCard(inCart)}>
                 {getImageUrl(product.image)
@@ -296,9 +359,7 @@ export default function Checkout() {
                   <p style={S.productName}>{product.name}</p>
                   {isBulk && <div style={S.bulkBadge}>📦 {product.pcsPerUnit} pcs/{product.unit}</div>}
                   <div style={S.priceRow}>
-                    <span style={S.price}>
-                      ₱{sp}<span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span>
-                    </span>
+                    <span style={S.price}>₱{sp}<span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span></span>
                     <span style={S.stockLabel}>{product.stock} pcs</span>
                   </div>
                   <button style={S.addBtn(inCart)} onClick={() => handleProductTap(product)} disabled={outOfStock}>
@@ -340,7 +401,6 @@ export default function Checkout() {
           const maxPacks = Math.floor(maxStock / pcsPerUnit);
           const pricePerPc = getSellingPrice(pickerProduct);
           const pricePerPack = pricePerPc * pcsPerUnit;
-
           return (
             <div style={S.overlay} onClick={e => e.target === e.currentTarget && setModal(null)}>
               <div style={S.qtyPickerWrap}>
@@ -353,7 +413,6 @@ export default function Checkout() {
                   </div>
                   <button style={S.closeBtn} onClick={() => setModal(null)}>✕</button>
                 </div>
-
                 {maxPacks >= 1 && (
                   <div style={{ marginBottom: "16px" }}>
                     <div style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick Add</div>
@@ -366,20 +425,17 @@ export default function Checkout() {
                     </div>
                   </div>
                 )}
-
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
                   <span style={{ fontSize: "12px", color: "#9ca3af" }}>or choose pieces</span>
                   <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
                 </div>
-
                 <div style={S.qtyPickerUnit}>Quantity (pcs)</div>
                 <div style={S.qtyPickerRow}>
                   <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.max(1, v - 1))}>−</button>
                   <div style={S.qtyPickerNum}>{pickerQty}</div>
                   <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.min(maxStock, v + 1))}>+</button>
                 </div>
-
                 <div style={S.shortcutsRow}>
                   {[1, 2, 3, 5, 10].filter(n => n <= maxStock).map(n => (
                     <button key={n} style={S.shortcutBtn(pickerQty === n)} onClick={() => setPickerQty(n)}>
@@ -387,11 +443,9 @@ export default function Checkout() {
                     </button>
                   ))}
                 </div>
-
                 <div style={S.qtyPickerPrice}>
                   ₱{(pricePerPc * pickerQty).toLocaleString("en-PH", { minimumFractionDigits: 0 })} total
                 </div>
-
                 <button style={S.qtyAddBtn} onClick={confirmPicker}>
                   Add {pickerQty} pc{pickerQty !== 1 ? "s" : ""} to Cart
                 </button>
@@ -422,9 +476,7 @@ export default function Checkout() {
                         }
                         <div style={S.cartItemInfo}>
                           <p style={S.cartItemName}>{product.name}</p>
-                          <p style={S.cartItemSub}>
-                            ₱{sp}/pc{isBulk ? ` · from ${product.unit}` : ""}
-                          </p>
+                          <p style={S.cartItemSub}>₱{sp}/pc{isBulk ? ` · from ${product.unit}` : ""}</p>
                         </div>
                         <div style={S.qtyControl}>
                           <button style={S.qtyBtn} onClick={() => updateQty(product._id, -1)}>−</button>
@@ -501,33 +553,46 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <button
-                    style={S.confirmBtn(loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer))}
-                    onClick={handleConfirm}
-                    disabled={loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer)}
-                  >
-                    {loading ? "Processing..." : `Confirm ${paymentMode === "cash" ? "Cash" : paymentMode === "gcash" ? "GCash" : "Utang"} Payment`}
-                  </button>
+                  {/* ── Sticky Confirm Button ── */}
+                  <div style={S.stickyBar}>
+                    <button
+                      style={S.confirmBtn(loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer))}
+                      onClick={handleConfirm}
+                      disabled={loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer)}
+                    >
+                      {loading ? "Processing..." : `Confirm ${paymentMode === "cash" ? "Cash" : paymentMode === "gcash" ? "GCash" : "Utang"} Payment`}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* Success Screen */}
+        {/* ── Success Screen ── */}
         {modal === "success" && successData && (
           <div style={S.successOverlay}>
             <div style={S.successIcon}>
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
             <div style={S.successTitle}>Sale Complete! 🎉</div>
-            <div style={S.successSub}>{successData.itemCount} pc{successData.itemCount !== 1 ? "s" : ""} sold · ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
-            {successData.paymentMode === "cash" && successData.change >= 0 && (
-              <div style={S.successChange}>💵 Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+            <div style={S.successSub}>
+              {successData.itemCount} pc{successData.itemCount !== 1 ? "s" : ""} sold &nbsp;·&nbsp; ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
+            </div>
+
+            {successData.paymentMode === "cash" && (
+              <div style={S.successBadge("green")}>
+                💵 Cash received &nbsp;·&nbsp; Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
+              </div>
             )}
-            {successData.paymentMode === "utang" && <div style={S.successChange}>📒 Added to {successData.customerName}'s utang</div>}
-            {successData.paymentMode === "gcash" && <div style={S.successChange}>📱 GCash payment received</div>}
-            <button style={S.newSaleBtn} onClick={resetCheckout}>New Sale</button>
+            {successData.paymentMode === "gcash" && (
+              <div style={S.successBadge("blue")}>📱 GCash payment received</div>
+            )}
+            {successData.paymentMode === "utang" && (
+              <div style={S.successBadge("orange")}>📒 Added to {successData.customerName}'s utang</div>
+            )}
+
+            <button style={S.newSaleBtn} onClick={resetCheckout}>+ New Sale</button>
           </div>
         )}
       </div>
