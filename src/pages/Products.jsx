@@ -52,7 +52,7 @@ function Toast({ toasts }) {
 
 const emptyForm = {
   image:"", name:"", category:"Snacks", customCategory:"",
-  unit:"pcs", pcsPerUnit:"", cost:"", markup:25,
+  unit:"pcs", pcsPerUnit:"", cost:"", markup:20,
   stock:"", reorder:10, expiry:"", supplier:"",
 };
 
@@ -370,12 +370,12 @@ export default function Products() {
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"10px", marginBottom:"14px" }}>
                       <div><label style={lbl}>Cost / {form.unit}</label><input style={inp} type="number" name="cost" value={form.cost} onChange={handleChange} placeholder="0.00" step="0.01" /></div>
                       <div><label style={lbl}>Pcs per {form.unit}</label><input style={inpHL} type="number" name="pcsPerUnit" value={form.pcsPerUnit} onChange={handleChange} placeholder="e.g. 10" min="1" /></div>
-                      <div><label style={lbl}>Markup %</label><input style={inp} type="number" name="markup" value={form.markup} onChange={handleChange} placeholder="25" /></div>
+                      <div><label style={lbl}>Markup %</label><input style={inp} type="number" name="markup" value={form.markup} onChange={handleChange} placeholder="20" /></div>
                     </div>
                   ) : (
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"14px" }}>
                       <div><label style={lbl}>Cost Price</label><input style={inp} type="number" name="cost" value={form.cost} onChange={handleChange} placeholder="0.00" step="0.01" /></div>
-                      <div><label style={lbl}>Markup %</label><input style={inp} type="number" name="markup" value={form.markup} onChange={handleChange} placeholder="25" /></div>
+                      <div><label style={lbl}>Markup %</label><input style={inp} type="number" name="markup" value={form.markup} onChange={handleChange} placeholder="20" /></div>
                     </div>
                   )}
 
