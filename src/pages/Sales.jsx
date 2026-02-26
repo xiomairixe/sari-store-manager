@@ -4,10 +4,10 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// ── Daily targets stored in localStorage (no backend changes needed) ──
-const TARGETS_KEY = "sari_daily_targets";
-const loadTargets = () => { try { return JSON.parse(localStorage.getItem(TARGETS_KEY) || "{}"); } catch { return {}; } };
-const saveTargets = (t) => localStorage.setItem(TARGETS_KEY, JSON.stringify(t));
+// Confirmed sales stored in localStorage — no backend changes needed
+const CONFIRMED_KEY = "sari_confirmed_sales";
+const loadConfirmed = () => { try { return JSON.parse(localStorage.getItem(CONFIRMED_KEY) || "{}"); } catch { return {}; } };
+const saveConfirmed = (d) => localStorage.setItem(CONFIRMED_KEY, JSON.stringify(d));
 
 const S = {
   page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
@@ -36,7 +36,7 @@ const S = {
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
   label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
   input: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" },
-  textarea: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", minHeight: "90px", resize: "vertical", marginBottom: "14px" },
+  textarea: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", minHeight: "80px", resize: "vertical", marginBottom: "14px" },
   submitBtn: { width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   emptyText: { textAlign: "center", color: "#9ca3af", padding: "20px 0", fontSize: "13px" },
   reviewSummaryBox: { background: "linear-gradient(135deg, #fff8f0 0%, #fff 100%)", border: "1.5px solid #fed7aa", borderRadius: "14px", padding: "16px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" },
@@ -69,94 +69,114 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// ── Single Record Row: shows actual vs expected + progress bar ──
-function RecordRow({ r, target, onSetTarget, onReview }) {
+// ── Record Row: system total vs confirmed actual ──
+function RecordRow({ r, confirmed, onConfirm, onReview }) {
   const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState(target ? String(target) : "");
+  const [inputVal, setInputVal] = useState(confirmed != null ? String(confirmed) : "");
   const inputRef = useRef(null);
 
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
-  const hasTarget = target > 0;
-  const pct = hasTarget ? Math.min((r.total / target) * 100, 100) : 0;
-  const met = hasTarget && r.total >= target;
-  const barColor = met ? "#16a34a" : pct >= 70 ? "#f97316" : "#ef4444";
+  const hasConfirmed = confirmed != null;
+  const diff = hasConfirmed ? confirmed - r.systemTotal : null;
+  const matched = diff === 0;
+  const over = diff > 0;
 
   const commit = () => {
     const val = parseFloat(inputVal);
-    onSetTarget(r.date, isNaN(val) || val <= 0 ? 0 : val);
+    onConfirm(r.date, isNaN(val) ? null : val);
     setEditing(false);
   };
 
   return (
     <div style={{ padding: "14px 0", borderBottom: "1px solid #f3f4f6" }}>
 
-      {/* ── Row 1: date + actual ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-        <div style={{ cursor: "pointer", flex: 1 }} onClick={onReview}>
+      {/* Top: date + review arrow */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <div style={{ cursor: "pointer" }} onClick={onReview}>
           <div style={{ fontSize: "15px", fontWeight: "600", color: "#1a1a2e" }}>{formatDate(r.date)}</div>
-          <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{r.count} transaction{r.count !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{r.count} transaction{r.count !== 1 ? "s" : ""} · tap to review</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "16px", fontWeight: "700", color: "#f97316" }}>
-              ₱{r.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-            </div>
-            <div style={{ fontSize: "11px", color: "#9ca3af" }}>actual</div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ cursor: "pointer", flexShrink: 0 }} onClick={onReview}>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
+
+      {/* System vs Actual side by side */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+
+        {/* System (from checkout) */}
+        <div style={{ backgroundColor: "#f9fafb", borderRadius: "12px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>System</div>
+          <div style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e" }}>
+            ₱{r.systemTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ cursor: "pointer", flexShrink: 0 }} onClick={onReview}>
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+          <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>from checkout</div>
+        </div>
+
+        {/* Actual (manually confirmed) */}
+        <div style={{
+          backgroundColor: hasConfirmed ? (matched ? "#f0fdf4" : over ? "#eff6ff" : "#fff1f2") : "#fff",
+          border: hasConfirmed ? `1.5px solid ${matched ? "#86efac" : over ? "#bfdbfe" : "#fecaca"}` : "1.5px dashed #e5e7eb",
+          borderRadius: "12px", padding: "10px 12px", cursor: "pointer",
+        }}
+          onClick={() => { setInputVal(confirmed != null ? String(confirmed) : ""); setEditing(true); }}
+        >
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>
+            Actual {hasConfirmed && <span style={{ color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>✓</span>}
+          </div>
+          {hasConfirmed ? (
+            <>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>
+                ₱{confirmed.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>tap to edit</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "13px", fontWeight: "600", color: "#9ca3af" }}>— tap to enter</div>
+              <div style={{ fontSize: "10px", color: "#bbb", marginTop: "2px" }}>your cash count</div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Row 2: expected label + value/input ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: hasTarget ? "8px" : "0" }}>
-        <span style={{ fontSize: "12px", color: "#9ca3af", flexShrink: 0 }}>Expected:</span>
+      {/* Difference badge */}
+      {hasConfirmed && !matched && (
+        <div style={{
+          fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center",
+          backgroundColor: over ? "#eff6ff" : "#fff1f2",
+          color: over ? "#3b82f6" : "#ef4444",
+        }}>
+          {over
+            ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over system — check for unrecorded sales`
+            : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} under system — possible missing cash`}
+        </div>
+      )}
+      {hasConfirmed && matched && (
+        <div style={{ fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center", backgroundColor: "#f0fdf4", color: "#16a34a" }}>
+          ✓ Cash matches system — all good!
+        </div>
+      )}
 
-        {editing ? (
-          <>
-            <span style={{ fontSize: "12px", color: "#9ca3af" }}>₱</span>
-            <input
-              ref={inputRef}
-              type="number"
-              value={inputVal}
-              onChange={e => setInputVal(e.target.value)}
-              onBlur={commit}
-              onKeyDown={e => e.key === "Enter" && commit()}
-              placeholder="e.g. 500"
-              style={{ width: "110px", border: "1.5px solid #f97316", borderRadius: "8px", padding: "4px 8px", fontSize: "13px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: "#1a1a2e" }}
-            />
-            <button onClick={commit} style={{ padding: "4px 12px", backgroundColor: "#f97316", border: "none", borderRadius: "8px", color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>✓</button>
-          </>
-        ) : hasTarget ? (
-          <>
-            <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>
-              ₱{target.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-            </span>
-            <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "99px", backgroundColor: met ? "#f0fdf4" : "#fff1f2", color: met ? "#16a34a" : "#ef4444", flexShrink: 0 }}>
-              {met ? "✓ MET" : `₱${(target - r.total).toLocaleString("en-PH", { minimumFractionDigits: 0 })} short`}
-            </span>
-            <button
-              onClick={() => { setInputVal(String(target)); setEditing(true); }}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#9ca3af", padding: "2px 4px", lineHeight: 1 }}
-              title="Edit target"
-            >✏️</button>
-          </>
-        ) : (
-          <button
-            onClick={() => { setInputVal(""); setEditing(true); }}
-            style={{ fontSize: "12px", color: "#f97316", background: "none", border: "1px dashed #fed7aa", borderRadius: "8px", padding: "3px 10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: "600" }}
-          >
-            + Set target
+      {/* Inline input */}
+      {editing && (
+        <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "14px", color: "#9ca3af", fontWeight: "600" }}>₱</span>
+          <input
+            ref={inputRef}
+            type="number"
+            step="0.01"
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => e.key === "Enter" && commit()}
+            placeholder="Enter your actual cash total"
+            style={{ flex: 1, border: "1.5px solid #f97316", borderRadius: "10px", padding: "9px 12px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: "#1a1a2e" }}
+          />
+          <button onClick={commit} style={{ padding: "9px 16px", backgroundColor: "#f97316", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+            Save
           </button>
-        )}
-      </div>
-
-      {/* ── Row 3: progress bar (only when target set) ── */}
-      {hasTarget && (
-        <div style={{ height: "6px", backgroundColor: "#f3f4f6", borderRadius: "99px", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${pct}%`, borderRadius: "99px", backgroundColor: barColor, transition: "width 0.4s ease" }} />
         </div>
       )}
     </div>
@@ -170,7 +190,7 @@ export default function Sales() {
   const [showModal, setShowModal] = useState(false);
   const [reviewDate, setReviewDate] = useState(null);
   const [form, setForm] = useState({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
-  const [targets, setTargets] = useState(loadTargets);
+  const [confirmed, setConfirmedState] = useState(loadConfirmed);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchSales(); fetchProducts(); }, []);
@@ -185,10 +205,10 @@ export default function Sales() {
     catch (err) { console.error(err); }
   };
 
-  const handleSetTarget = (date, val) => {
-    const updated = { ...targets, [date]: val };
-    setTargets(updated);
-    saveTargets(updated);
+  const handleConfirm = (date, val) => {
+    const updated = { ...confirmed, [date]: val };
+    setConfirmedState(updated);
+    saveConfirmed(updated);
   };
 
   const handleSubmit = async (e) => {
@@ -247,11 +267,12 @@ export default function Sales() {
 
   const slowMoving = [...products].sort((a, b) => b.stock - a.stock).slice(0, 3);
 
+  // Group sales by date with systemTotal from checkout transactions
   const recentByDate = Object.values(
     sales.reduce((acc, s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
-      if (!acc[key]) acc[key] = { date: key, total: 0, count: 0 };
-      acc[key].total += parseFloat(s.total || s.unitPrice || 0);
+      if (!acc[key]) acc[key] = { date: key, systemTotal: 0, count: 0 };
+      acc[key].systemTotal += parseFloat(s.total || s.unitPrice || 0);
       acc[key].count += 1;
       return acc;
     }, {})
@@ -263,8 +284,8 @@ export default function Sales() {
   const reviewTotal = reviewSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const getTxnType = (s) => (s.productId && s.productId !== "null" ? "checkout" : "manual");
 
-  const targetedDays = recentByDate.filter(r => targets[r.date] > 0);
-  const metDays = targetedDays.filter(r => r.total >= targets[r.date]);
+  const confirmedCount = recentByDate.filter(r => confirmed[r.date] != null).length;
+  const matchedCount = recentByDate.filter(r => confirmed[r.date] != null && confirmed[r.date] === r.systemTotal).length;
 
   return (
     <>
@@ -316,28 +337,29 @@ export default function Sales() {
             )}
           </div>
 
-          {/* ── Recent Records with Expected vs Actual ── */}
+          {/* ── Recent Records with System vs Actual ── */}
           <div style={S.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
               <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Recent Records</div>
-              {targetedDays.length > 0 && (
-                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "99px", backgroundColor: metDays.length === targetedDays.length ? "#f0fdf4" : "#fff8f0", color: metDays.length === targetedDays.length ? "#16a34a" : "#f97316" }}>
-                  {metDays.length}/{targetedDays.length} targets met
+              {confirmedCount > 0 && (
+                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "99px", backgroundColor: matchedCount === confirmedCount ? "#f0fdf4" : "#fff8f0", color: matchedCount === confirmedCount ? "#16a34a" : "#f97316" }}>
+                  {matchedCount}/{confirmedCount} matched
                 </span>
               )}
             </div>
             <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>
-              Tap a row to review transactions · Tap "+ Set target" to track your daily goal
+              At end of day, tap <strong style={{ color: "#374151" }}>Actual</strong> box to enter your real cash count and compare vs system
             </div>
+
             {recentByDate.length === 0 ? (
-              <div style={S.emptyText}>No sales recorded yet. Tap + to add.</div>
+              <div style={S.emptyText}>No sales recorded yet.</div>
             ) : (
               recentByDate.map((r) => (
                 <RecordRow
                   key={r.date}
                   r={r}
-                  target={targets[r.date] || 0}
-                  onSetTarget={handleSetTarget}
+                  confirmed={confirmed[r.date] ?? null}
+                  onConfirm={handleConfirm}
                   onReview={() => setReviewDate(r.date)}
                 />
               ))
@@ -385,30 +407,30 @@ export default function Sales() {
                 </div>
                 <div style={S.modalSub}>{formatDate(reviewDate)}</div>
 
-                {/* Expected vs Actual summary inside review modal */}
-                {targets[reviewDate] > 0 && (() => {
-                  const t = targets[reviewDate];
-                  const hit = reviewTotal >= t;
-                  const pct2 = Math.min((reviewTotal / t) * 100, 100);
+                {/* System vs Actual comparison inside review */}
+                {confirmed[reviewDate] != null && (() => {
+                  const c = confirmed[reviewDate];
+                  const diff = c - reviewTotal;
+                  const matched2 = diff === 0;
                   return (
-                    <div style={{ backgroundColor: hit ? "#f0fdf4" : "#fff1f2", border: `1.5px solid ${hit ? "#86efac" : "#fecaca"}`, borderRadius: "14px", padding: "16px", marginBottom: "16px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <div style={{ backgroundColor: matched2 ? "#f0fdf4" : diff > 0 ? "#eff6ff" : "#fff1f2", border: `1.5px solid ${matched2 ? "#86efac" : diff > 0 ? "#bfdbfe" : "#fecaca"}`, borderRadius: "14px", padding: "16px", marginBottom: "16px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                         <div>
-                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>Actual</div>
-                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#1a1a2e" }}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>System</div>
+                          <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>Expected</div>
-                          <div style={{ fontSize: "22px", fontWeight: "700", color: "#9ca3af" }}>₱{t.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>Actual Cash</div>
+                          <div style={{ fontSize: "20px", fontWeight: "700", color: matched2 ? "#16a34a" : diff > 0 ? "#3b82f6" : "#ef4444" }}>₱{c.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
                         </div>
                       </div>
-                      <div style={{ height: "8px", backgroundColor: "#e5e7eb", borderRadius: "99px", overflow: "hidden", marginBottom: "10px" }}>
-                        <div style={{ height: "100%", width: `${pct2}%`, borderRadius: "99px", backgroundColor: hit ? "#16a34a" : pct2 >= 70 ? "#f97316" : "#ef4444", transition: "width 0.4s ease" }} />
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: "700", textAlign: "center", color: hit ? "#16a34a" : "#ef4444" }}>
-                        {hit
-                          ? `🎉 Target met! +₱${(reviewTotal - t).toLocaleString("en-PH", { minimumFractionDigits: 2 })} over`
-                          : `₱${(t - reviewTotal).toLocaleString("en-PH", { minimumFractionDigits: 2 })} short of target`}
+                      <div style={{ fontSize: "13px", fontWeight: "700", textAlign: "center", color: matched2 ? "#16a34a" : diff > 0 ? "#3b82f6" : "#ef4444" }}>
+                        {matched2
+                          ? "✓ Cash matches system — all good!"
+                          : diff > 0
+                            ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over — check for unrecorded sales`
+                            : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} short — possible missing cash`
+                        }
                       </div>
                     </div>
                   );
@@ -416,7 +438,7 @@ export default function Sales() {
 
                 <div style={S.reviewSummaryBox}>
                   <div>
-                    <div style={S.reviewSummaryLabel}>TOTAL REVENUE</div>
+                    <div style={S.reviewSummaryLabel}>SYSTEM TOTAL</div>
                     <div style={S.reviewSummaryTotal}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
                     <div style={S.reviewSummaryCount}>{reviewSales.length} transaction{reviewSales.length !== 1 ? "s" : ""}</div>
                   </div>
@@ -446,9 +468,7 @@ export default function Sales() {
               </div>
 
               <div style={S.submitBtnWrap}>
-                <button style={{ ...S.submitBtn, backgroundColor: "#1a1a2e" }} onClick={() => setReviewDate(null)}>
-                  Close
-                </button>
+                <button style={{ ...S.submitBtn, backgroundColor: "#1a1a2e" }} onClick={() => setReviewDate(null)}>Close</button>
               </div>
             </div>
           </div>

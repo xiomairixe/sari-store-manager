@@ -206,7 +206,6 @@ export default function Products() {
           background: #fff;
           border-radius: 24px 24px 0 0;
           width: 100%;
-          max-height: calc(100vh - ${NAVBAR_H}px);
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
           padding: 24px 20px 0;
@@ -315,7 +314,7 @@ export default function Products() {
 
         {/* Add/Edit Modal */}
         {showModal && (
-          <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.45)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div style={{ position:"fixed", top:0, left:0, right:0, bottom:"64px", backgroundColor:"rgba(0,0,0,0.45)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
             <div className="modal-sheet">
 
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>

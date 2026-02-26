@@ -28,7 +28,7 @@ const S = {
   deleteBtn: { padding: "9px 12px", border: "1.5px solid #e5e7eb", borderRadius: "10px", backgroundColor: "#fff", color: "#9ca3af", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#1a1a2e", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 100 },
   overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 40px", maxHeight: "90vh", overflowY: "auto" },
+  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 100px", maxHeight: "90vh", overflowY: "auto" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
   modalTitle: { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
