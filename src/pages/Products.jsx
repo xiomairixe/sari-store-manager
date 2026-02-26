@@ -430,16 +430,18 @@ export default function Products() {
 
                   <div style={{ marginBottom:"14px" }}><label style={lbl}>Expiry Date</label><input style={inp} type="date" name="expiry" value={form.expiry} onChange={handleChange} /></div>
                   <div style={{ marginBottom:"8px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
+
+                  <button type="submit" form="pform" disabled={submitting}
+                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
+                  {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
+                </button>
                 </form>
               </div>
 
               {/* ── PINNED FOOTER — always above navbar ── */}
-              <div className="modal-footer">
-                <button type="submit" form="pform" disabled={submitting}
-                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
-                  {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
-                </button>
-              </div>
+              {/* <div className="modal-footer">
+                
+              </div> */}
 
             </div>
           </div>
