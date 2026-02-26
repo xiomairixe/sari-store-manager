@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import React from "react";
 
-// ── Use environment variable for API base URL ──
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const API_URL = `${BASE_URL}/products`;
 
@@ -15,6 +15,17 @@ const getImageUrl = (image) => {
 const CATEGORIES = ["All", "Snacks", "Beverages","Candies", "Cigarettes", "Seasonings","Noodles", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
+
+// ── SINGLE SOURCE OF TRUTH: always compute per-piece price from raw fields ──
+const computeSellingPrice = (product) => {
+  const cost = parseFloat(product.cost) || 0;
+  const markup = parseFloat(product.markup) || 0;
+  if (BULK_UNITS.includes(product.unit) && product.pcsPerUnit && parseFloat(product.pcsPerUnit) > 0) {
+    const costPerPc = cost / parseFloat(product.pcsPerUnit);
+    return costPerPc * (1 + markup / 100);
+  }
+  return cost * (1 + markup / 100);
+};
 
 const styles = {
   page: {
@@ -109,6 +120,7 @@ const styles = {
     fontSize: "16px", fontWeight: "700",
     color: outOfStock ? "#9ca3af" : "#f97316",
     position: "absolute", bottom: "14px", right: "14px",
+    textAlign: "right",
   }),
   outOfStockStrip: {
     position: "absolute",
@@ -230,6 +242,7 @@ const emptyForm = {
 };
 
 export default function Products() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
@@ -280,15 +293,15 @@ export default function Products() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  // ── Form preview: per-piece selling price ──
   const calcSellingPrice = () => {
     const cost = parseFloat(form.cost) || 0;
     const markup = parseFloat(form.markup) || 0;
-    if (isBulkUnit) {
-      const pcs = parseFloat(form.pcsPerUnit) || 1;
-      const costPerPc = cost / pcs;
-      return (costPerPc + (costPerPc * markup) / 100).toFixed(2);
+    if (isBulkUnit && form.pcsPerUnit && parseFloat(form.pcsPerUnit) > 0) {
+      const costPerPc = cost / parseFloat(form.pcsPerUnit);
+      return (costPerPc * (1 + markup / 100)).toFixed(2);
     }
-    return (cost + (cost * markup) / 100).toFixed(2);
+    return (cost * (1 + markup / 100)).toFixed(2);
   };
 
   const costPerPc = () => {
@@ -317,7 +330,7 @@ export default function Products() {
       expiry: product.expiry ? product.expiry.split("T")[0] : "",
       supplier: product.supplier || "",
     });
-    setEditId(product._id); // ✅ fixed: was product.id
+    setEditId(product._id);
     setImagePreview(getImageUrl(product.image) || null);
     setImageFile(null); setShowModal(true); setContextMenu(null);
   };
@@ -333,6 +346,7 @@ export default function Products() {
       const submitForm = { ...form };
       if (form.category === "Other" && form.customCategory?.trim()) submitForm.category = form.customCategory.trim();
       delete submitForm.customCategory;
+      // ── Save sellingPrice always as per-piece ──
       submitForm.sellingPrice = calcSellingPrice();
       const formData = new FormData();
       Object.entries(submitForm).forEach(([k, v]) => formData.append(k, v ?? ""));
@@ -391,12 +405,27 @@ export default function Products() {
               </div>
             )}
           </div>
-          <button style={styles.historyBtn}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" />
-              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
-            </svg>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              onClick={() => navigate("/suppliers")}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                backgroundColor: "#fff", border: "1.5px solid #e5e7eb",
+                borderRadius: "20px", padding: "7px 14px",
+                fontSize: "13px", fontWeight: "600", color: "#374151",
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+              }}
+            >
+              🏪 Suppliers
+            </button>
+            <button style={styles.historyBtn}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" />
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -431,14 +460,15 @@ export default function Products() {
             </div>
           ) : (
             filtered.map((product) => {
-              const sp = product.sellingPrice || (parseFloat(product.cost) * (1 + parseFloat(product.markup) / 100)).toFixed(2);
-              const isBulk = BULK_UNITS.includes(product.unit);
+              // ── Always recompute from raw fields — never trust stored sellingPrice for bulk ──
+              const sp = computeSellingPrice(product);
+              const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
               const stock = parseInt(product.stock);
               const outOfStock = stock === 0;
 
               return (
                 <div
-                  key={product._id} // ✅ fixed: was product.id
+                  key={product._id}
                   style={styles.productCard(outOfStock)}
                   onContextMenu={(e) => { e.preventDefault(); handleLongPress(e, product); }}
                   onTouchStart={(e) => {
@@ -448,11 +478,7 @@ export default function Products() {
                   onTouchEnd={(e) => clearTimeout(e.currentTarget._timer)}
                 >
                   {getImageUrl(product.image) ? (
-                    <img
-                      src={getImageUrl(product.image)}
-                      alt={product.name}
-                      style={styles.productImage(outOfStock)}
-                    />
+                    <img src={getImageUrl(product.image)} alt={product.name} style={styles.productImage(outOfStock)} />
                   ) : (
                     <div style={styles.productImagePlaceholder(outOfStock)}>📦</div>
                   )}
@@ -461,25 +487,24 @@ export default function Products() {
                     <p style={styles.productName(outOfStock)}>{product.name}</p>
                     <span style={styles.categoryBadge(outOfStock)}>{product.category}</span>
                     <p style={styles.costText}>
-                      Cost: ₱{parseFloat(product.cost).toFixed(2)}{isBulk && product.pcsPerUnit ? ` (${product.pcsPerUnit} pcs/${product.unit})` : ""}
+                      Cost: ₱{parseFloat(product.cost).toFixed(2)}
+                      {isBulk ? ` / ${product.unit} (${product.pcsPerUnit} pcs)` : ""}
                     </p>
                   </div>
 
                   <div style={styles.stockBadge(stock)}>
-                    {outOfStock ? "No Stock" : `${stock} ${product.unit}`}
+                    {outOfStock ? "No Stock" : `${stock} pcs`}
                   </div>
 
                   {!outOfStock && (
                     <div style={styles.sellingPrice(false)}>
-                      ₱{parseFloat(sp).toFixed(2)}
-                      {isBulk && <span style={{ fontSize: "10px", display: "block", textAlign: "right", color: "#fb923c" }}>/pcs</span>}
+                      ₱{sp.toFixed(2)}
+                      <span style={{ fontSize: "10px", display: "block", color: "#fb923c" }}>/pc</span>
                     </div>
                   )}
 
                   {outOfStock && (
-                    <div style={styles.outOfStockStrip}>
-                      OUT OF STOCK · Restock needed
-                    </div>
+                    <div style={styles.outOfStockStrip}>OUT OF STOCK · Restock needed</div>
                   )}
                 </div>
               );
@@ -603,7 +628,7 @@ export default function Products() {
                     <div style={styles.bulkRow}><span>Pcs per {form.unit}</span><span>{form.pcsPerUnit || "—"}</span></div>
                     <div style={styles.bulkRow}><span>Cost per piece</span><span>₱{form.pcsPerUnit ? costPerPc() : "—"}</span></div>
                     <div style={styles.bulkRow}><span>Markup</span><span>{form.markup}%</span></div>
-                    <div style={styles.bulkRowBold}><span>Selling price / pcs</span><span>₱{form.pcsPerUnit ? calcSellingPrice() : "—"}</span></div>
+                    <div style={styles.bulkRowBold}><span>Selling price / pc</span><span>₱{form.pcsPerUnit ? calcSellingPrice() : "—"}</span></div>
                     {form.pcsPerUnit && (
                       <div style={{ marginTop: "8px", fontSize: "12px", color: "#16a34a", textAlign: "right" }}>
                         Total revenue if all sold: ₱{totalRevenue()} &nbsp;|&nbsp; Profit: ₱{profit()}
@@ -622,7 +647,12 @@ export default function Products() {
 
                 <div style={styles.row2}>
                   <div>
-                    <label style={styles.label}>Current Stock <span style={{ fontWeight: "400", color: "#9ca3af" }}>({isBulkUnit ? form.unit + "s" : "pcs"})</span></label>
+                    <label style={styles.label}>
+                      Current Stock{" "}
+                      <span style={{ fontWeight: "400", color: "#9ca3af" }}>
+                        ({isBulkUnit ? `${form.unit}s` : "pcs"})
+                      </span>
+                    </label>
                     <input style={styles.input} type="number" name="stock" value={form.stock} onChange={handleChange} placeholder="0" />
                   </div>
                   <div>

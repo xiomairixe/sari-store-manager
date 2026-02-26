@@ -14,12 +14,11 @@ const getImageUrl = (image) => {
 
 const CATEGORIES = ["All", "Snacks", "Beverages", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
 
-// ── Price is always per PIECE ──
+// ── Price is always per PIECE — never trust stored sellingPrice, always recompute ──
 const getSellingPrice = (p) => {
-  if (p.sellingPrice) return parseFloat(p.sellingPrice);
-  const cost = parseFloat(p.cost);
+  const cost = parseFloat(p.cost) || 0;
   const markup = parseFloat(p.markup) || 0;
-  if (BULK_UNITS.includes(p.unit) && p.pcsPerUnit) {
+  if (BULK_UNITS.includes(p.unit) && p.pcsPerUnit && parseFloat(p.pcsPerUnit) > 0) {
     return (cost / parseFloat(p.pcsPerUnit)) * (1 + markup / 100);
   }
   return cost * (1 + markup / 100);
