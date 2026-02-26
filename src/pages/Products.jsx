@@ -460,9 +460,12 @@ export default function Products() {
             </div>
           ) : (
             filtered.map((product) => {
-              // ── Always recompute from raw fields — never trust stored sellingPrice for bulk ──
+              const isBulkUnit = BULK_UNITS.includes(product.unit);
+              // ── pcsPerUnit missing = stale data, flag it ──
+              const missingPcsPerUnit = isBulkUnit && (!product.pcsPerUnit || parseFloat(product.pcsPerUnit) <= 0);
+              const isBulk = isBulkUnit && !missingPcsPerUnit;
+              // ── Always recompute from raw fields — never trust stored sellingPrice ──
               const sp = computeSellingPrice(product);
-              const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
               const stock = parseInt(product.stock);
               const outOfStock = stock === 0;
 
@@ -490,6 +493,11 @@ export default function Products() {
                       Cost: ₱{parseFloat(product.cost).toFixed(2)}
                       {isBulk ? ` / ${product.unit} (${product.pcsPerUnit} pcs)` : ""}
                     </p>
+                    {missingPcsPerUnit && (
+                      <p style={{ fontSize: "11px", color: "#ef4444", fontWeight: "600", margin: "3px 0 0" }}>
+                        ⚠ Edit & re-save to fix price
+                      </p>
+                    )}
                   </div>
 
                   <div style={styles.stockBadge(stock)}>
