@@ -150,7 +150,7 @@ export default function Checkout() {
         @keyframes slideDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
         .modal-sheet { display:flex; flex-direction:column; background:#fff; border-radius:24px 24px 0 0; width:100%; height:88vh; overflow:hidden; }
         .modal-body  { flex:1; overflow-y:auto; padding:24px 20px 8px; -webkit-overflow-scrolling:touch; }
-        .modal-footer{ flex-shrink:0; padding:12px 20px; padding-bottom:max(20px,env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #f0f0f0; }
+        .modal-footer{ flex-shrink:0; padding:12px 20px; padding-bottom:max(88px,calc(70px + env(safe-area-inset-bottom))); background:#fff; border-top:1px solid #f0f0f0; }
       `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <Toast toasts={toasts} />
