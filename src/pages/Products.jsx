@@ -342,7 +342,7 @@ export default function Products() {
                 <form id="pform" onSubmit={handleSubmit}>
                   {/* Image */}
                   <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"18px" }}>
-                    <div onClick={() => fileInputRef.current.click()} style={{ width:"70px", height:"70px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
+                    <div onClick={() => fileInputRef.current.click()} style={{ width:"88px", height:"88px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
                       {imagePreview ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>}
                     </div>
                     <div style={{ flex:1 }}>
@@ -430,18 +430,16 @@ export default function Products() {
 
                   <div style={{ marginBottom:"14px" }}><label style={lbl}>Expiry Date</label><input style={inp} type="date" name="expiry" value={form.expiry} onChange={handleChange} /></div>
                   <div style={{ marginBottom:"8px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
-
-                  <button type="submit" form="pform" disabled={submitting}
-                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
-                  {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
-                </button>
                 </form>
               </div>
 
               {/* ── PINNED FOOTER — always above navbar ── */}
-              {/* <div className="modal-footer">
-                
-              </div> */}
+              <div className="modal-footer">
+                <button type="submit" form="pform" disabled={submitting}
+                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
+                  {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
+                </button>
+              </div>
 
             </div>
           </div>
