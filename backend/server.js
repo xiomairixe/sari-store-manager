@@ -66,6 +66,23 @@ const deleteCloudinaryImage = async (imageUrl) => {
   }
 };
 
+// ── Helper: parse numeric fields from FormData (all come in as strings) ──
+const BULK_UNITS = ["pack", "box"];
+
+const parseProductFields = (body) => {
+  const data = { ...body };
+  // Parse all numeric fields — FormData sends everything as strings
+  ["cost", "markup", "stock", "reorder", "pcsPerUnit", "sellingPrice"].forEach((field) => {
+    if (data[field] !== undefined && data[field] !== "") {
+      const parsed = parseFloat(data[field]);
+      data[field] = isNaN(parsed) ? null : parsed;
+    } else if (data[field] === "") {
+      data[field] = null;
+    }
+  });
+  return data;
+};
+
 // ── Models ──
 import Product from "./models/product.js";
 import Sale from "./models/sale.js";
@@ -90,14 +107,19 @@ app.get("/products/:id", async (req, res) => {
 
 app.post("/products", upload.single("image"), async (req, res) => {
   try {
-    const data = { ...req.body };
+    // ── FIX: parse numeric fields properly from FormData ──
+    const data = parseProductFields(req.body);
     if (req.file) data.image = req.file.path;
 
     // ── Stock is always saved in PIECES ──
-    // If bulk (pack/box) and owner entered packs, convert to pcs before saving
-    const isBulk = ["pack", "box"].includes(data.unit);
-    if (isBulk && data.pcsPerUnit && parseFloat(data.pcsPerUnit) > 0) {
-      data.stock = parseFloat(data.stock) * parseFloat(data.pcsPerUnit);
+    const isBulk = BULK_UNITS.includes(data.unit);
+    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
+      data.stock = (data.stock || 0) * data.pcsPerUnit;
+      // ── Recompute sellingPrice per piece ──
+      const costPerPc = (data.cost || 0) / data.pcsPerUnit;
+      data.sellingPrice = costPerPc * (1 + (data.markup || 0) / 100);
+    } else {
+      data.sellingPrice = (data.cost || 0) * (1 + (data.markup || 0) / 100);
     }
 
     const product = new Product(data);
@@ -108,7 +130,9 @@ app.post("/products", upload.single("image"), async (req, res) => {
 
 app.put("/products/:id", upload.single("image"), async (req, res) => {
   try {
-    const data = { ...req.body };
+    // ── FIX: parse numeric fields properly from FormData ──
+    const data = parseProductFields(req.body);
+
     if (req.file) {
       const old = await Product.findById(req.params.id);
       if (old?.image) await deleteCloudinaryImage(old.image);
@@ -116,12 +140,20 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
     }
 
     // ── If stock was re-entered in packs, convert to pcs ──
-    // Frontend sends stockInPacks flag when owner edits stock count
-    const isBulk = ["pack", "box"].includes(data.unit);
-    if (isBulk && data.pcsPerUnit && data.stockInPacks === "true") {
-      data.stock = parseFloat(data.stock) * parseFloat(data.pcsPerUnit);
+    const isBulk = BULK_UNITS.includes(data.unit);
+    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
+      if (data.stockInPacks === "true") {
+        data.stock = (data.stock || 0) * data.pcsPerUnit;
+      }
+      // ── FIX: always recompute sellingPrice per piece on edit ──
+      const costPerPc = (data.cost || 0) / data.pcsPerUnit;
+      data.sellingPrice = costPerPc * (1 + (data.markup || 0) / 100);
+    } else {
+      data.sellingPrice = (data.cost || 0) * (1 + (data.markup || 0) / 100);
     }
     delete data.stockInPacks; // clean up before saving
+
+    data.updatedAt = new Date();
 
     const updated = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
     res.json(updated);

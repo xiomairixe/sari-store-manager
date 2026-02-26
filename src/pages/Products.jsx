@@ -12,15 +12,23 @@ const getImageUrl = (image) => {
   return `${BASE_URL}/uploads/${image}`;
 };
 
-const CATEGORIES = ["All", "Snacks", "Beverages","Candies", "Cigarettes", "Seasonings","Noodles", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
+const CATEGORIES = [
+  "All", "Snacks", "Beverages", "Candies", "Cigarettes", "Seasonings",
+  "Noodles", "Canned Goods", "Personal Care", "Household",
+  "School & Office Supplies", "General Merchandise", "Other",
+];
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
 
-// ── SINGLE SOURCE OF TRUTH: always compute per-piece price from raw fields ──
+// ── Always recompute per-piece price from raw fields — never trust stored sellingPrice ──
 const computeSellingPrice = (product) => {
   const cost = parseFloat(product.cost) || 0;
   const markup = parseFloat(product.markup) || 0;
-  if (BULK_UNITS.includes(product.unit) && product.pcsPerUnit && parseFloat(product.pcsPerUnit) > 0) {
+  if (
+    BULK_UNITS.includes(product.unit) &&
+    product.pcsPerUnit &&
+    parseFloat(product.pcsPerUnit) > 0
+  ) {
     const costPerPc = cost / parseFloat(product.pcsPerUnit);
     return costPerPc * (1 + markup / 100);
   }
@@ -35,14 +43,9 @@ const styles = {
     paddingBottom: "90px",
   },
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "20px 20px 10px",
-    backgroundColor: "#f5f6fa",
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "20px 20px 10px", backgroundColor: "#f5f6fa",
+    position: "sticky", top: 0, zIndex: 10,
   },
   title: { fontSize: "26px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   historyBtn: {
@@ -92,9 +95,8 @@ const styles = {
   productImagePlaceholder: (outOfStock) => ({
     width: "72px", height: "72px", borderRadius: "12px",
     backgroundColor: outOfStock ? "#e5e7eb" : "#f0f0f0",
-    display: "flex", alignItems: "center",
-    justifyContent: "center", flexShrink: 0,
-    color: outOfStock ? "#9ca3af" : "#bbb", fontSize: "24px",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0, color: outOfStock ? "#9ca3af" : "#bbb", fontSize: "24px",
   }),
   productInfo: { flex: 1, minWidth: 0 },
   productName: (outOfStock) => ({
@@ -119,20 +121,13 @@ const styles = {
   sellingPrice: (outOfStock) => ({
     fontSize: "16px", fontWeight: "700",
     color: outOfStock ? "#9ca3af" : "#f97316",
-    position: "absolute", bottom: "14px", right: "14px",
-    textAlign: "right",
+    position: "absolute", bottom: "14px", right: "14px", textAlign: "right",
   }),
   outOfStockStrip: {
-    position: "absolute",
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: "#fee2e2",
-    borderRadius: "0 0 14px 14px",
-    padding: "4px 0",
-    textAlign: "center",
-    fontSize: "11px",
-    fontWeight: "700",
-    color: "#ef4444",
-    letterSpacing: "0.05em",
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "#fee2e2", borderRadius: "0 0 14px 14px",
+    padding: "4px 0", textAlign: "center",
+    fontSize: "11px", fontWeight: "700", color: "#ef4444", letterSpacing: "0.05em",
   },
   fab: {
     position: "fixed", bottom: "85px", right: "20px",
@@ -166,10 +161,7 @@ const styles = {
     justifyContent: "center", overflow: "hidden", cursor: "pointer",
     backgroundColor: "#fafafa", flexShrink: 0,
   },
-  label: {
-    fontSize: "13px", fontWeight: "600", color: "#374151",
-    marginBottom: "6px", display: "block",
-  },
+  label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
   input: {
     width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px",
     padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif",
@@ -212,8 +204,7 @@ const styles = {
   infoBox: {
     backgroundColor: "#eff6ff", border: "1px solid #bfdbfe",
     borderRadius: "10px", padding: "10px 14px",
-    fontSize: "12px", color: "#1e40af",
-    marginBottom: "14px", lineHeight: "1.5",
+    fontSize: "12px", color: "#1e40af", marginBottom: "14px", lineHeight: "1.5",
   },
   submitBtn: {
     width: "100%", backgroundColor: "#f97316", color: "#fff",
@@ -282,7 +273,9 @@ export default function Products() {
 
   const handleChange = (e) => {
     const updated = { ...form, [e.target.name]: e.target.value };
-    if (e.target.name === "unit" && !BULK_UNITS.includes(e.target.value)) updated.pcsPerUnit = "";
+    if (e.target.name === "unit" && !BULK_UNITS.includes(e.target.value)) {
+      updated.pcsPerUnit = "";
+    }
     setForm(updated);
   };
 
@@ -293,7 +286,6 @@ export default function Products() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // ── Form preview: per-piece selling price ──
   const calcSellingPrice = () => {
     const cost = parseFloat(form.cost) || 0;
     const markup = parseFloat(form.markup) || 0;
@@ -310,8 +302,10 @@ export default function Products() {
     return (cost / pcs).toFixed(2);
   };
 
-  const totalRevenue = () => (parseFloat(calcSellingPrice()) * (parseFloat(form.pcsPerUnit) || 1)).toFixed(2);
-  const profit = () => (parseFloat(totalRevenue()) - (parseFloat(form.cost) || 0)).toFixed(2);
+  const totalRevenue = () =>
+    (parseFloat(calcSellingPrice()) * (parseFloat(form.pcsPerUnit) || 1)).toFixed(2);
+  const profit = () =>
+    (parseFloat(totalRevenue()) - (parseFloat(form.cost) || 0)).toFixed(2);
 
   const openAdd = () => {
     setForm(emptyForm); setEditId(null);
@@ -321,42 +315,62 @@ export default function Products() {
   const openEdit = (product) => {
     const isCustomCategory = !CATEGORIES.includes(product.category);
     setForm({
-      image: product.image || "", name: product.name,
+      image: product.image || "",
+      name: product.name,
       category: isCustomCategory ? "Other" : product.category,
       customCategory: isCustomCategory ? product.category : "",
-      unit: product.unit, pcsPerUnit: product.pcsPerUnit || "",
-      cost: product.cost, markup: product.markup, stock: product.stock,
+      unit: product.unit,
+      pcsPerUnit: product.pcsPerUnit || "",
+      cost: product.cost,
+      markup: product.markup,
+      stock: product.stock,
       reorder: product.reorder || 10,
       expiry: product.expiry ? product.expiry.split("T")[0] : "",
       supplier: product.supplier || "",
     });
     setEditId(product._id);
     setImagePreview(getImageUrl(product.image) || null);
-    setImageFile(null); setShowModal(true); setContextMenu(null);
+    setImageFile(null);
+    setShowModal(true);
+    setContextMenu(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.cost || !form.stock) { alert("Please fill all required fields."); return; }
-    if (form.category === "Other" && !form.customCategory?.trim()) { alert("Please specify the category."); return; }
+    if (!form.name || !form.cost || !form.stock) {
+      alert("Please fill all required fields."); return;
+    }
+    if (form.category === "Other" && !form.customCategory?.trim()) {
+      alert("Please specify the category."); return;
+    }
     if (isBulkUnit && (!form.pcsPerUnit || parseFloat(form.pcsPerUnit) < 1)) {
       alert(`Please enter how many pieces are in one ${form.unit}.`); return;
     }
     try {
       const submitForm = { ...form };
-      if (form.category === "Other" && form.customCategory?.trim()) submitForm.category = form.customCategory.trim();
-      delete submitForm.customCategory;
-      // ── Save sellingPrice always as per-piece ──
-      submitForm.sellingPrice = calcSellingPrice();
-      const formData = new FormData();
-      Object.entries(submitForm).forEach(([k, v]) => formData.append(k, v ?? ""));
-      if (imageFile) formData.append("image", imageFile);
-      if (editId) {
-        await axios.put(`${API_URL}/${editId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        await axios.post(API_URL, formData, { headers: { "Content-Type": "multipart/form-data" } });
+      if (form.category === "Other" && form.customCategory?.trim()) {
+        submitForm.category = form.customCategory.trim();
       }
-      setShowModal(false); fetchProducts();
+      delete submitForm.customCategory;
+      submitForm.sellingPrice = calcSellingPrice();
+
+      const formData = new FormData();
+      Object.entries(submitForm).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) formData.append(k, v);
+      });
+      if (imageFile) formData.append("image", imageFile);
+
+      if (editId) {
+        await axios.put(`${API_URL}/${editId}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        await axios.post(API_URL, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+      setShowModal(false);
+      fetchProducts();
     } catch (err) { console.error("Error saving product:", err); }
   };
 
@@ -388,13 +402,13 @@ export default function Products() {
       return 0;
     });
 
-  const outOfStockCount = products.filter(p => parseInt(p.stock) === 0).length;
+  const outOfStockCount = products.filter((p) => parseInt(p.stock) === 0).length;
 
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
       <div style={styles.page}>
+
         {/* Header */}
         <div style={styles.header}>
           <div>
@@ -460,11 +474,10 @@ export default function Products() {
             </div>
           ) : (
             filtered.map((product) => {
-              const isBulkUnit = BULK_UNITS.includes(product.unit);
-              // ── pcsPerUnit missing = stale data, flag it ──
-              const missingPcsPerUnit = isBulkUnit && (!product.pcsPerUnit || parseFloat(product.pcsPerUnit) <= 0);
-              const isBulk = isBulkUnit && !missingPcsPerUnit;
-              // ── Always recompute from raw fields — never trust stored sellingPrice ──
+              const isBulk = BULK_UNITS.includes(product.unit);
+              // ── missingPcsPerUnit: bulk product saved before fix ──
+              const missingPcsPerUnit =
+                isBulk && (!product.pcsPerUnit || parseFloat(product.pcsPerUnit) <= 0);
               const sp = computeSellingPrice(product);
               const stock = parseInt(product.stock);
               const outOfStock = stock === 0;
@@ -491,11 +504,13 @@ export default function Products() {
                     <span style={styles.categoryBadge(outOfStock)}>{product.category}</span>
                     <p style={styles.costText}>
                       Cost: ₱{parseFloat(product.cost).toFixed(2)}
-                      {isBulk ? ` / ${product.unit} (${product.pcsPerUnit} pcs)` : ""}
+                      {isBulk && product.pcsPerUnit
+                        ? ` / ${product.unit} (${product.pcsPerUnit} pcs)`
+                        : ""}
                     </p>
                     {missingPcsPerUnit && (
                       <p style={{ fontSize: "11px", color: "#ef4444", fontWeight: "600", margin: "3px 0 0" }}>
-                        ⚠ Edit & re-save to fix price
+                        ⚠ Edit &amp; re-save to fix price
                       </p>
                     )}
                   </div>
@@ -527,7 +542,11 @@ export default function Products() {
         {contextMenu && (
           <div
             ref={contextRef}
-            style={{ ...styles.contextMenu, left: Math.min(contextMenu.x, window.innerWidth - 180), top: Math.min(contextMenu.y, window.innerHeight - 120) }}
+            style={{
+              ...styles.contextMenu,
+              left: Math.min(contextMenu.x, window.innerWidth - 180),
+              top: Math.min(contextMenu.y, window.innerHeight - 120),
+            }}
           >
             <button style={styles.contextItem(false)} onClick={() => openEdit(contextMenu.product)}>✏️ Edit</button>
             <button style={styles.contextItem(true)} onClick={() => handleDelete(contextMenu.product._id)}>🗑️ Delete</button>
@@ -544,13 +563,15 @@ export default function Products() {
               </div>
 
               <form onSubmit={handleSubmit}>
+                {/* Image */}
                 <div style={styles.imageUploadRow}>
                   <div style={styles.imagePreviewBox} onClick={() => fileInputRef.current.click()}>
                     {imagePreview ? (
                       <img src={imagePreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" />
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
                         <polyline points="21 15 16 10 5 21" />
                       </svg>
                     )}
@@ -561,46 +582,59 @@ export default function Products() {
                       type="text" name="image"
                       placeholder="https://example.com/image.jpg"
                       style={{ ...styles.input, fontSize: "12px", color: "#9ca3af" }}
-                      value={form.image} onChange={handleChange}
+                      value={form.image}
+                      onChange={handleChange}
                     />
                     <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>or tap box to upload</div>
                   </div>
                   <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
                 </div>
 
+                {/* Name */}
                 <div style={styles.fieldGroup}>
                   <label style={styles.label}>Product Name</label>
                   <input style={styles.input} name="name" value={form.name} onChange={handleChange} placeholder="e.g. Lucky Me Pancit Canton" />
                 </div>
 
+                {/* Category + Unit */}
                 <div style={styles.row2}>
                   <div>
                     <label style={styles.label}>Category</label>
                     <select style={styles.input} name="category" value={form.category} onChange={handleChange}>
-                      {CATEGORIES.filter(c => c !== "All").map(c => <option key={c}>{c}</option>)}
+                      {CATEGORIES.filter((c) => c !== "All").map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
                     <label style={styles.label}>Unit Bought</label>
                     <select style={styles.input} name="unit" value={form.unit} onChange={handleChange}>
-                      {UNITS.map(u => <option key={u}>{u}</option>)}
+                      {UNITS.map((u) => <option key={u}>{u}</option>)}
                     </select>
                   </div>
                 </div>
 
+                {/* Custom category */}
                 {form.category === "Other" && (
                   <div style={styles.fieldGroup}>
                     <label style={styles.label}>Specify Category <span style={{ color: "#ef4444" }}>*</span></label>
-                    <input style={styles.inputHighlight} name="customCategory" value={form.customCategory || ""} onChange={handleChange} placeholder="e.g. Frozen Goods, Condiments..." autoFocus />
+                    <input
+                      style={styles.inputHighlight}
+                      name="customCategory"
+                      value={form.customCategory || ""}
+                      onChange={handleChange}
+                      placeholder="e.g. Frozen Goods, Condiments..."
+                      autoFocus
+                    />
                   </div>
                 )}
 
+                {/* Bulk info box */}
                 {isBulkUnit && (
                   <div style={styles.infoBox}>
                     💡 You selected <strong>{form.unit}</strong> — selling price will be computed <strong>per piece</strong>. Enter how many pieces are inside one {form.unit}.
                   </div>
                 )}
 
+                {/* Cost / Markup / pcsPerUnit */}
                 {isBulkUnit ? (
                   <div style={styles.row3}>
                     <div>
@@ -629,6 +663,7 @@ export default function Products() {
                   </div>
                 )}
 
+                {/* Selling price preview */}
                 {isBulkUnit ? (
                   <div style={styles.bulkPreview}>
                     <div style={styles.bulkPreviewTitle}>🧮 Per-Piece Breakdown</div>
@@ -653,6 +688,7 @@ export default function Products() {
                   </div>
                 )}
 
+                {/* Stock + Reorder */}
                 <div style={styles.row2}>
                   <div>
                     <label style={styles.label}>
@@ -669,17 +705,21 @@ export default function Products() {
                   </div>
                 </div>
 
+                {/* Expiry */}
                 <div style={styles.fieldGroup}>
                   <label style={styles.label}>Expiry Date</label>
                   <input style={styles.input} type="date" name="expiry" value={form.expiry} onChange={handleChange} />
                 </div>
 
+                {/* Supplier */}
                 <div style={styles.fieldGroup}>
                   <label style={styles.label}>Supplier</label>
                   <input style={styles.input} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" />
                 </div>
 
-                <button type="submit" style={styles.submitBtn}>{editId ? "Update Product" : "Add Product"}</button>
+                <button type="submit" style={styles.submitBtn}>
+                  {editId ? "Update Product" : "Add Product"}
+                </button>
               </form>
             </div>
           </div>
