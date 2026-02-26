@@ -20,7 +20,7 @@ const CATEGORIES = [
 const UNITS = ["pcs", "pack", "sachet", "can", "bottle", "box", "kg", "g", "L", "ml"];
 const BULK_UNITS = ["pack", "box"];
 
-// ── Always recompute per-piece price from raw fields — never trust stored sellingPrice ──
+// ── Always recompute per-piece price — ceil to next whole peso ──
 const computeSellingPrice = (product) => {
   const cost = parseFloat(product.cost) || 0;
   const markup = parseFloat(product.markup) || 0;
@@ -30,9 +30,9 @@ const computeSellingPrice = (product) => {
     parseFloat(product.pcsPerUnit) > 0
   ) {
     const costPerPc = cost / parseFloat(product.pcsPerUnit);
-    return costPerPc * (1 + markup / 100);
+    return Math.ceil(costPerPc * (1 + markup / 100));
   }
-  return cost * (1 + markup / 100);
+  return Math.ceil(cost * (1 + markup / 100));
 };
 
 const styles = {
@@ -286,14 +286,15 @@ export default function Products() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  // ── Selling price preview — ceil to next whole peso ──
   const calcSellingPrice = () => {
     const cost = parseFloat(form.cost) || 0;
     const markup = parseFloat(form.markup) || 0;
     if (isBulkUnit && form.pcsPerUnit && parseFloat(form.pcsPerUnit) > 0) {
       const costPerPc = cost / parseFloat(form.pcsPerUnit);
-      return (costPerPc * (1 + markup / 100)).toFixed(2);
+      return Math.ceil(costPerPc * (1 + markup / 100)).toFixed(0);
     }
-    return (cost * (1 + markup / 100)).toFixed(2);
+    return Math.ceil(cost * (1 + markup / 100)).toFixed(0);
   };
 
   const costPerPc = () => {
@@ -475,7 +476,6 @@ export default function Products() {
           ) : (
             filtered.map((product) => {
               const isBulk = BULK_UNITS.includes(product.unit);
-              // ── missingPcsPerUnit: bulk product saved before fix ──
               const missingPcsPerUnit =
                 isBulk && (!product.pcsPerUnit || parseFloat(product.pcsPerUnit) <= 0);
               const sp = computeSellingPrice(product);
@@ -521,7 +521,7 @@ export default function Products() {
 
                   {!outOfStock && (
                     <div style={styles.sellingPrice(false)}>
-                      ₱{sp.toFixed(2)}
+                      ₱{sp}
                       <span style={{ fontSize: "10px", display: "block", color: "#fb923c" }}>/pc</span>
                     </div>
                   )}
@@ -630,7 +630,7 @@ export default function Products() {
                 {/* Bulk info box */}
                 {isBulkUnit && (
                   <div style={styles.infoBox}>
-                    💡 You selected <strong>{form.unit}</strong> — selling price will be computed <strong>per piece</strong>. Enter how many pieces are inside one {form.unit}.
+                    💡 You selected <strong>{form.unit}</strong> — selling price will be computed <strong>per piece</strong> and rounded up to the nearest peso. Enter how many pieces are inside one {form.unit}.
                   </div>
                 )}
 
@@ -671,7 +671,10 @@ export default function Products() {
                     <div style={styles.bulkRow}><span>Pcs per {form.unit}</span><span>{form.pcsPerUnit || "—"}</span></div>
                     <div style={styles.bulkRow}><span>Cost per piece</span><span>₱{form.pcsPerUnit ? costPerPc() : "—"}</span></div>
                     <div style={styles.bulkRow}><span>Markup</span><span>{form.markup}%</span></div>
-                    <div style={styles.bulkRowBold}><span>Selling price / pc</span><span>₱{form.pcsPerUnit ? calcSellingPrice() : "—"}</span></div>
+                    <div style={styles.bulkRowBold}>
+                      <span>Selling price / pc</span>
+                      <span>₱{form.pcsPerUnit ? calcSellingPrice() : "—"}</span>
+                    </div>
                     {form.pcsPerUnit && (
                       <div style={{ marginTop: "8px", fontSize: "12px", color: "#16a34a", textAlign: "right" }}>
                         Total revenue if all sold: ₱{totalRevenue()} &nbsp;|&nbsp; Profit: ₱{profit()}
@@ -681,7 +684,7 @@ export default function Products() {
                 ) : (
                   <div style={styles.sellingPreview}>
                     <div>
-                      <div style={styles.sellingLabel}>Selling Price (auto-calculated)</div>
+                      <div style={styles.sellingLabel}>Selling Price (rounded up to whole peso)</div>
                       <div style={styles.sellingSubtext}>₱{parseFloat(form.cost || 0).toFixed(2)} + {form.markup}% markup</div>
                     </div>
                     <div style={styles.sellingAmount}>₱{calcSellingPrice()}</div>

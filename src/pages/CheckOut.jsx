@@ -12,16 +12,20 @@ const getImageUrl = (image) => {
   return `${BASE_URL}/uploads/${image}`;
 };
 
-const CATEGORIES = ["All", "Snacks", "Beverages", "Canned Goods", "Personal Care", "Household", "School & Office Supplies", "General Merchandise", "Other"];
+const CATEGORIES = [
+  "All", "Snacks", "Beverages", "Candies", "Cigarettes", "Seasonings",
+  "Noodles", "Canned Goods", "Personal Care", "Household",
+  "School & Office Supplies", "General Merchandise", "Other",
+];
 
-// ── Price is always per PIECE — never trust stored sellingPrice, always recompute ──
+// ── Price is always per PIECE — ceil to next whole peso ──
 const getSellingPrice = (p) => {
   const cost = parseFloat(p.cost) || 0;
   const markup = parseFloat(p.markup) || 0;
   if (BULK_UNITS.includes(p.unit) && p.pcsPerUnit && parseFloat(p.pcsPerUnit) > 0) {
-    return (cost / parseFloat(p.pcsPerUnit)) * (1 + markup / 100);
+    return Math.ceil((cost / parseFloat(p.pcsPerUnit)) * (1 + markup / 100));
   }
-  return cost * (1 + markup / 100);
+  return Math.ceil(cost * (1 + markup / 100));
 };
 
 const S = {
@@ -109,7 +113,6 @@ const S = {
   customerOption: (active) => ({ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "12px", border: `1.5px solid ${active ? "#f97316" : "#e5e7eb"}`, backgroundColor: active ? "#fff8f0" : "#fff", marginBottom: "8px", cursor: "pointer" }),
   customerOptionName: { fontSize: "14px", fontWeight: "600", color: "#1a1a2e" },
   customerOptionBalance: { fontSize: "12px", color: "#9ca3af" },
-  // ── Qty Picker ──
   qtyPickerWrap: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 40px" },
   qtyPickerRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: "24px", margin: "20px 0 12px" },
   qtyPickerBtn: { width: "52px", height: "52px", borderRadius: "50%", border: "2px solid #f97316", backgroundColor: "#fff", color: "#f97316", fontSize: "26px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" },
@@ -136,9 +139,8 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState(null);
 
-  // ── Qty Picker ──
   const [pickerProduct, setPickerProduct] = useState(null);
-  const [pickerQty, setPickerQty] = useState(1); // always in pcs
+  const [pickerQty, setPickerQty] = useState(1);
 
   useEffect(() => { fetchProducts(); fetchUtangCustomers(); }, []);
 
@@ -152,7 +154,6 @@ export default function Checkout() {
     catch (err) { console.error(err); }
   };
 
-  // ── Tap product ──
   const handleProductTap = (product) => {
     const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
     if (isBulk) {
@@ -170,7 +171,6 @@ export default function Checkout() {
     }
   };
 
-  // ── Confirm picker (qty always in pcs) ──
   const confirmPicker = () => {
     if (!pickerProduct || pickerQty < 1) return;
     setCart(prev => ({ ...prev, [pickerProduct._id]: { product: pickerProduct, qty: pickerQty } }));
@@ -178,7 +178,6 @@ export default function Checkout() {
     setPickerProduct(null);
   };
 
-  // ── Add whole pack as pcs shortcut ──
   const addWholePack = (packs = 1) => {
     if (!pickerProduct) return;
     const pcsPerUnit = parseInt(pickerProduct.pcsPerUnit) || 1;
@@ -213,7 +212,7 @@ export default function Checkout() {
         await axios.post(`${BASE_URL}/sales`, {
           productId: product._id,
           productName: product.name,
-          qty,                              // always pcs
+          qty,
           unitPrice: getSellingPrice(product),
           saleDate: new Date().toISOString(),
         });
@@ -224,7 +223,13 @@ export default function Checkout() {
           notes: `Checkout: ${cartItems.map(i => `${i.product.name} x${i.qty}pcs`).join(", ")}`,
         });
       }
-      setSuccessData({ total: subtotal, change: paymentMode === "cash" ? change : 0, paymentMode, customerName: selectedUtangCustomer?.customerName || null, itemCount: cartCount });
+      setSuccessData({
+        total: subtotal,
+        change: paymentMode === "cash" ? change : 0,
+        paymentMode,
+        customerName: selectedUtangCustomer?.customerName || null,
+        itemCount: cartCount,
+      });
       setModal("success");
       setCart({});
       setCashInput("");
@@ -257,7 +262,9 @@ export default function Checkout() {
         {/* Search */}
         <div style={S.searchWrapper}>
           <div style={S.searchBox}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
             <input style={S.searchInput} placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
@@ -290,7 +297,7 @@ export default function Checkout() {
                   {isBulk && <div style={S.bulkBadge}>📦 {product.pcsPerUnit} pcs/{product.unit}</div>}
                   <div style={S.priceRow}>
                     <span style={S.price}>
-                      ₱{sp.toFixed(2)}<span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span>
+                      ₱{sp}<span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span>
                     </span>
                     <span style={S.stockLabel}>{product.stock} pcs</span>
                   </div>
@@ -313,20 +320,20 @@ export default function Checkout() {
             <div style={S.cartBarRow}>
               <div>
                 <div style={S.cartBarLabel}>Total Amount</div>
-                <div style={S.cartBarTotal}>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                <div style={S.cartBarTotal}>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
               </div>
               <span style={{ backgroundColor: "#f97316", color: "#fff", borderRadius: "99px", padding: "2px 10px", fontSize: "13px", fontWeight: "700" }}>
                 {cartCount} pc{cartCount !== 1 ? "s" : ""}
               </span>
             </div>
             <button style={S.viewCartBtn} onClick={() => setModal("cart")}>
-              <span>Review & Pay</span>
+              <span>Review &amp; Pay</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
         )}
 
-        {/* ── Qty Picker Modal (bulk products) ── */}
+        {/* Qty Picker Modal */}
         {modal === "qtyPicker" && pickerProduct && (() => {
           const pcsPerUnit = parseInt(pickerProduct.pcsPerUnit) || 1;
           const maxStock = parseInt(pickerProduct.stock);
@@ -341,38 +348,31 @@ export default function Checkout() {
                   <div>
                     <h2 style={S.modalTitle}>{pickerProduct.name}</h2>
                     <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#9ca3af" }}>
-                      {maxStock} pcs available · ₱{pricePerPc.toFixed(2)}/pc
+                      {maxStock} pcs available · ₱{pricePerPc}/pc
                     </p>
                   </div>
                   <button style={S.closeBtn} onClick={() => setModal(null)}>✕</button>
                 </div>
 
-                {/* ── Whole pack quick button ── */}
                 {maxPacks >= 1 && (
                   <div style={{ marginBottom: "16px" }}>
                     <div style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick Add</div>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       {[1, 2, 3].filter(n => n <= maxPacks).map(n => (
-                        <button
-                          key={n}
-                          style={S.packShortcutBtn}
-                          onClick={() => addWholePack(n)}
-                        >
-                          📦 {n} whole {pickerProduct.unit}{n > 1 ? "s" : ""} = {n * pcsPerUnit} pcs · ₱{(pricePerPack * n).toFixed(2)}
+                        <button key={n} style={S.packShortcutBtn} onClick={() => addWholePack(n)}>
+                          📦 {n} whole {pickerProduct.unit}{n > 1 ? "s" : ""} = {n * pcsPerUnit} pcs · ₱{(pricePerPack * n).toLocaleString("en-PH", { minimumFractionDigits: 0 })}
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* ── Divider ── */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
                   <span style={{ fontSize: "12px", color: "#9ca3af" }}>or choose pieces</span>
                   <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
                 </div>
 
-                {/* ── Pcs counter ── */}
                 <div style={S.qtyPickerUnit}>Quantity (pcs)</div>
                 <div style={S.qtyPickerRow}>
                   <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.max(1, v - 1))}>−</button>
@@ -380,7 +380,6 @@ export default function Checkout() {
                   <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.min(maxStock, v + 1))}>+</button>
                 </div>
 
-                {/* ── Pcs shortcuts ── */}
                 <div style={S.shortcutsRow}>
                   {[1, 2, 3, 5, 10].filter(n => n <= maxStock).map(n => (
                     <button key={n} style={S.shortcutBtn(pickerQty === n)} onClick={() => setPickerQty(n)}>
@@ -390,7 +389,7 @@ export default function Checkout() {
                 </div>
 
                 <div style={S.qtyPickerPrice}>
-                  ₱{(pricePerPc * pickerQty).toLocaleString("en-PH", { minimumFractionDigits: 2 })} total
+                  ₱{(pricePerPc * pickerQty).toLocaleString("en-PH", { minimumFractionDigits: 0 })} total
                 </div>
 
                 <button style={S.qtyAddBtn} onClick={confirmPicker}>
@@ -401,7 +400,7 @@ export default function Checkout() {
           );
         })()}
 
-        {/* ── Cart Modal ── */}
+        {/* Cart Modal */}
         {modal === "cart" && (
           <div style={S.overlay} onClick={e => e.target === e.currentTarget && setModal(null)}>
             <div style={S.modal}>
@@ -424,7 +423,7 @@ export default function Checkout() {
                         <div style={S.cartItemInfo}>
                           <p style={S.cartItemName}>{product.name}</p>
                           <p style={S.cartItemSub}>
-                            ₱{sp.toFixed(2)}/pc{isBulk ? ` · from ${product.unit}` : ""}
+                            ₱{sp}/pc{isBulk ? ` · from ${product.unit}` : ""}
                           </p>
                         </div>
                         <div style={S.qtyControl}>
@@ -432,14 +431,20 @@ export default function Checkout() {
                           <span style={S.qtyNum}>{qty}<span style={{ fontSize: "9px", color: "#9ca3af" }}>pc</span></span>
                           <button style={S.qtyBtn} onClick={() => updateQty(product._id, 1)}>+</button>
                         </div>
-                        <div style={S.cartItemTotal}>₱{(sp * qty).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                        <div style={S.cartItemTotal}>₱{(sp * qty).toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
                       </div>
                     );
                   })}
 
                   <div style={S.summaryBox}>
-                    <div style={S.summaryRow}><span>{cartCount} pc{cartCount !== 1 ? "s" : ""}</span><span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
-                    <div style={S.summaryTotal}><span>Total</span><span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+                    <div style={S.summaryRow}>
+                      <span>{cartCount} pc{cartCount !== 1 ? "s" : ""}</span>
+                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
+                    </div>
+                    <div style={S.summaryTotal}>
+                      <span>Total</span>
+                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
+                    </div>
                   </div>
 
                   <div style={S.sectionTitle}>Payment Method</div>
@@ -452,11 +457,11 @@ export default function Checkout() {
                   {paymentMode === "cash" && (
                     <>
                       <label style={S.label}>Cash Received (₱)</label>
-                      <input style={S.input} type="number" placeholder="0.00" value={cashInput} onChange={e => setCashInput(e.target.value)} autoFocus />
+                      <input style={S.input} type="number" placeholder="0" value={cashInput} onChange={e => setCashInput(e.target.value)} autoFocus />
                       {cashPaid >= subtotal && (
                         <div style={S.changeBox}>
                           <span style={S.changeLabel}>Change</span>
-                          <span style={S.changeAmt}>₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+                          <span style={S.changeAmt}>₱{change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
                         </div>
                       )}
                     </>
@@ -464,7 +469,7 @@ export default function Checkout() {
 
                   {paymentMode === "gcash" && (
                     <div style={{ backgroundColor: "#eff6ff", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", fontSize: "13px", color: "#1e40af" }}>
-                      📱 GCash payment of <strong>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</strong> — confirm once received.
+                      📱 GCash payment of <strong>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</strong> — confirm once received.
                     </div>
                   )}
 
@@ -482,7 +487,7 @@ export default function Checkout() {
                                 <div style={{ flex: 1 }}>
                                   <div style={S.customerOptionName}>{c.customerName}</div>
                                   <div style={S.customerOptionBalance}>
-                                    Balance: ₱{balance.toFixed(2)} / Limit: ₱{limit.toFixed(2)}
+                                    Balance: ₱{balance.toFixed(0)} / Limit: ₱{limit.toFixed(0)}
                                     {wouldExceed && <span style={{ color: "#ef4444", marginLeft: "6px" }}>⚠ Exceeds limit</span>}
                                   </div>
                                 </div>
@@ -516,8 +521,10 @@ export default function Checkout() {
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
             <div style={S.successTitle}>Sale Complete! 🎉</div>
-            <div style={S.successSub}>{successData.itemCount} pc{successData.itemCount !== 1 ? "s" : ""} sold · ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-            {successData.paymentMode === "cash" && successData.change >= 0 && <div style={S.successChange}>💵 Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>}
+            <div style={S.successSub}>{successData.itemCount} pc{successData.itemCount !== 1 ? "s" : ""} sold · ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+            {successData.paymentMode === "cash" && successData.change >= 0 && (
+              <div style={S.successChange}>💵 Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+            )}
             {successData.paymentMode === "utang" && <div style={S.successChange}>📒 Added to {successData.customerName}'s utang</div>}
             {successData.paymentMode === "gcash" && <div style={S.successChange}>📱 GCash payment received</div>}
             <button style={S.newSaleBtn} onClick={resetCheckout}>New Sale</button>

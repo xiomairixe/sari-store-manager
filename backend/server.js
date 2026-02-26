@@ -71,7 +71,6 @@ const BULK_UNITS = ["pack", "box"];
 
 const parseProductFields = (body) => {
   const data = { ...body };
-  // Parse all numeric fields — FormData sends everything as strings
   ["cost", "markup", "stock", "reorder", "pcsPerUnit", "sellingPrice"].forEach((field) => {
     if (data[field] !== undefined && data[field] !== "") {
       const parsed = parseFloat(data[field]);
@@ -81,6 +80,16 @@ const parseProductFields = (body) => {
     }
   });
   return data;
+};
+
+// ── Helper: compute selling price — always ceil to next whole peso ──
+const computeSellingPrice = (cost, markup, unit, pcsPerUnit) => {
+  const isBulk = BULK_UNITS.includes(unit);
+  if (isBulk && pcsPerUnit && pcsPerUnit > 0) {
+    const costPerPc = cost / pcsPerUnit;
+    return Math.ceil(costPerPc * (1 + markup / 100));
+  }
+  return Math.ceil(cost * (1 + markup / 100));
 };
 
 // ── Models ──
@@ -107,7 +116,6 @@ app.get("/products/:id", async (req, res) => {
 
 app.post("/products", upload.single("image"), async (req, res) => {
   try {
-    // ── FIX: parse numeric fields properly from FormData ──
     const data = parseProductFields(req.body);
     if (req.file) data.image = req.file.path;
 
@@ -115,12 +123,15 @@ app.post("/products", upload.single("image"), async (req, res) => {
     const isBulk = BULK_UNITS.includes(data.unit);
     if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
       data.stock = (data.stock || 0) * data.pcsPerUnit;
-      // ── Recompute sellingPrice per piece ──
-      const costPerPc = (data.cost || 0) / data.pcsPerUnit;
-      data.sellingPrice = costPerPc * (1 + (data.markup || 0) / 100);
-    } else {
-      data.sellingPrice = (data.cost || 0) * (1 + (data.markup || 0) / 100);
     }
+
+    // ── Selling price always rounded UP to next whole peso ──
+    data.sellingPrice = computeSellingPrice(
+      data.cost || 0,
+      data.markup || 0,
+      data.unit,
+      data.pcsPerUnit
+    );
 
     const product = new Product(data);
     await product.save();
@@ -130,7 +141,6 @@ app.post("/products", upload.single("image"), async (req, res) => {
 
 app.put("/products/:id", upload.single("image"), async (req, res) => {
   try {
-    // ── FIX: parse numeric fields properly from FormData ──
     const data = parseProductFields(req.body);
 
     if (req.file) {
@@ -141,17 +151,18 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
 
     // ── If stock was re-entered in packs, convert to pcs ──
     const isBulk = BULK_UNITS.includes(data.unit);
-    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
-      if (data.stockInPacks === "true") {
-        data.stock = (data.stock || 0) * data.pcsPerUnit;
-      }
-      // ── FIX: always recompute sellingPrice per piece on edit ──
-      const costPerPc = (data.cost || 0) / data.pcsPerUnit;
-      data.sellingPrice = costPerPc * (1 + (data.markup || 0) / 100);
-    } else {
-      data.sellingPrice = (data.cost || 0) * (1 + (data.markup || 0) / 100);
+    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0 && data.stockInPacks === "true") {
+      data.stock = (data.stock || 0) * data.pcsPerUnit;
     }
-    delete data.stockInPacks; // clean up before saving
+    delete data.stockInPacks;
+
+    // ── Selling price always rounded UP to next whole peso ──
+    data.sellingPrice = computeSellingPrice(
+      data.cost || 0,
+      data.markup || 0,
+      data.unit,
+      data.pcsPerUnit
+    );
 
     data.updatedAt = new Date();
 
