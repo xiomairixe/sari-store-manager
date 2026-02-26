@@ -4,7 +4,7 @@ import axios from "axios";
 import React from "react";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const BULK_UNITS = ["pack", "box"];
+const BULK_UNITS = ["pack","box"];
 
 const getImageUrl = (image) => {
   if (!image) return null;
@@ -13,183 +13,38 @@ const getImageUrl = (image) => {
 };
 
 const CATEGORIES = [
-  "All", "Snacks", "Beverages", "Candies", "Cigarettes", "Seasonings",
-  "Noodles", "Canned Goods", "Personal Care", "Household",
-  "School & Office Supplies", "General Merchandise", "Other",
+  "All","Snacks","Beverages","Candies","Cigarettes","Seasonings",
+  "Noodles","Canned Goods","Personal Care","Household",
+  "School & Office Supplies","General Merchandise","Other",
 ];
 
 const getSellingPrice = (p) => {
   const cost = parseFloat(p.cost) || 0;
   const markup = parseFloat(p.markup) || 0;
-  if (BULK_UNITS.includes(p.unit) && p.pcsPerUnit && parseFloat(p.pcsPerUnit) > 0) {
+  if (BULK_UNITS.includes(p.unit) && p.pcsPerUnit && parseFloat(p.pcsPerUnit) > 0)
     return Math.ceil((cost / parseFloat(p.pcsPerUnit)) * (1 + markup / 100));
-  }
   return Math.ceil(cost * (1 + markup / 100));
 };
 
-// ── Toast notification ──
-function Toast({ toast, onClose }) {
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(onClose, 2800);
-    return () => clearTimeout(t);
-  }, [toast]);
-  if (!toast) return null;
-  const isSuccess = toast.type === "success";
+function Toast({ toasts }) {
   return (
-    <>
-      <style>{`@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
-      <div style={{
-        position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)",
-        zIndex: 9999, backgroundColor: isSuccess ? "#1a1a2e" : "#fff",
-        borderRadius: "16px", padding: "14px 18px",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-        display: "flex", alignItems: "center", gap: "12px",
-        minWidth: "260px", maxWidth: "320px",
-        animation: "slideDown 0.25s ease",
-      }}>
-        <div style={{
-          width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
-          backgroundColor: isSuccess ? "#f97316" : "#fee2e2",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "16px", fontWeight: "700", color: isSuccess ? "#fff" : "#ef4444",
+    <div style={{ position:"fixed", top:"20px", left:"50%", transform:"translateX(-50%)", zIndex:9999,
+      display:"flex", flexDirection:"column", gap:"8px", width:"calc(100% - 40px)", maxWidth:"360px", pointerEvents:"none" }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          backgroundColor: t.type==="success"?"#1a1a2e":"#fee2e2",
+          borderLeft:`4px solid ${t.type==="success"?"#f97316":"#ef4444"}`,
+          borderRadius:"12px", padding:"12px 16px",
+          display:"flex", alignItems:"center", gap:"10px",
+          boxShadow:"0 4px 20px rgba(0,0,0,0.2)", animation:"slideDown 0.25s ease",
         }}>
-          {isSuccess ? "✓" : "✕"}
+          <span style={{ fontSize:"18px" }}>{t.type==="success"?"✅":"❌"}</span>
+          <span style={{ fontSize:"13px", fontWeight:"600", fontFamily:"'DM Sans',sans-serif", color:t.type==="success"?"#fff":"#ef4444" }}>{t.message}</span>
         </div>
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: isSuccess ? "#fff" : "#ef4444" }}>
-            {toast.title}
-          </div>
-          {toast.subtitle && (
-            <div style={{ fontSize: "12px", color: isSuccess ? "rgba(255,255,255,0.6)" : "#9ca3af", marginTop: "2px" }}>
-              {toast.subtitle}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
+      ))}
+    </div>
   );
 }
-
-const S = {
-  page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "180px" },
-  header: { padding: "20px 20px 12px", backgroundColor: "#f5f6fa", position: "sticky", top: 0, zIndex: 10 },
-  headerTop: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" },
-  title: { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-  subtitle: { fontSize: "13px", color: "#9ca3af", marginTop: "2px" },
-  searchWrapper: { padding: "4px 20px 8px" },
-  searchBox: { display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#eef0f5", borderRadius: "14px", padding: "10px 16px" },
-  searchInput: { border: "none", background: "transparent", outline: "none", fontSize: "14px", color: "#333", width: "100%", fontFamily: "'DM Sans', sans-serif" },
-  categoryScroll: { display: "flex", gap: "8px", overflowX: "auto", padding: "4px 20px 10px", scrollbarWidth: "none" },
-  categoryChip: (active) => ({
-    flexShrink: 0, padding: "6px 16px", borderRadius: "20px",
-    border: "1.5px solid", borderColor: active ? "#f97316" : "#ddd",
-    backgroundColor: active ? "#f97316" : "#fff",
-    color: active ? "#fff" : "#666", fontSize: "13px",
-    fontWeight: active ? "600" : "400", cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
-  }),
-  productGrid: { padding: "0 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
-  productCard: (inCart) => ({
-    backgroundColor: "#fff", borderRadius: "16px", overflow: "hidden",
-    boxShadow: inCart ? "0 0 0 2px #f97316" : "0 1px 4px rgba(0,0,0,0.07)",
-    position: "relative", transition: "box-shadow 0.15s ease",
-  }),
-  productImg: { width: "100%", height: "130px", objectFit: "cover", display: "block" },
-  productImgPlaceholder: { width: "100%", height: "130px", backgroundColor: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px" },
-  productBody: { padding: "10px 12px 12px" },
-  productName: { fontSize: "13px", fontWeight: "600", color: "#1a1a2e", margin: "0 0 4px", lineHeight: "1.3", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" },
-  bulkBadge: { display: "inline-block", backgroundColor: "#eff6ff", color: "#3b82f6", fontSize: "10px", fontWeight: "700", padding: "2px 6px", borderRadius: "6px", marginBottom: "5px" },
-  priceRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" },
-  price: { fontSize: "15px", fontWeight: "700", color: "#f97316" },
-  stockLabel: { fontSize: "11px", color: "#9ca3af" },
-  addBtn: (inCart) => ({
-    width: "100%", padding: "8px 0",
-    backgroundColor: inCart ? "#fff8f0" : "#f97316",
-    border: inCart ? "1.5px solid #f97316" : "none",
-    borderRadius: "10px", color: inCart ? "#f97316" : "#fff",
-    fontSize: "13px", fontWeight: "700", cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-  }),
-  cartBadge: { position: "absolute", top: "8px", right: "8px", backgroundColor: "#f97316", color: "#fff", borderRadius: "99px", fontSize: "11px", fontWeight: "700", padding: "2px 7px" },
-  outOfStock: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "16px" },
-  outOfStockText: { backgroundColor: "#fee2e2", color: "#ef4444", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "99px" },
-  cartBar: { position: "fixed", bottom: "70px", left: 0, right: 0, backgroundColor: "#1a1a2e", borderRadius: "20px 20px 0 0", padding: "16px 20px", zIndex: 50, boxShadow: "0 -4px 20px rgba(0,0,0,0.15)" },
-  cartBarRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
-  cartBarLabel: { fontSize: "13px", color: "rgba(255,255,255,0.6)" },
-  cartBarTotal: { fontSize: "22px", fontWeight: "700", color: "#fff" },
-  viewCartBtn: { width: "100%", padding: "14px", backgroundColor: "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "space-between" },
-  overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  // ── modal NO bottom padding — sticky bar handles it ──
-  modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "24px 20px 0" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
-  modalTitle: { fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-  closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
-  cartItem: { display: "flex", gap: "12px", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #f3f4f6" },
-  cartItemImg: { width: "52px", height: "52px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, backgroundColor: "#f0f0f0" },
-  cartItemInfo: { flex: 1, minWidth: 0 },
-  cartItemName: { fontSize: "14px", fontWeight: "600", color: "#1a1a2e", margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  cartItemSub: { fontSize: "11px", color: "#9ca3af" },
-  qtyControl: { display: "flex", alignItems: "center", gap: "8px" },
-  qtyBtn: { width: "28px", height: "28px", borderRadius: "50%", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", cursor: "pointer", fontSize: "16px", fontWeight: "700", color: "#374151", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" },
-  qtyNum: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", minWidth: "24px", textAlign: "center" },
-  cartItemTotal: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", textAlign: "right", minWidth: "60px" },
-  summaryBox: { backgroundColor: "#f9fafb", borderRadius: "14px", padding: "14px 16px", margin: "16px 0" },
-  summaryRow: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#6b7280", marginBottom: "8px" },
-  summaryTotal: { display: "flex", justifyContent: "space-between", fontSize: "17px", fontWeight: "700", color: "#1a1a2e", borderTop: "1px solid #e5e7eb", paddingTop: "10px", marginTop: "4px" },
-  sectionTitle: { fontSize: "14px", fontWeight: "700", color: "#374151", marginBottom: "10px" },
-  paymentOptions: { display: "flex", gap: "8px", marginBottom: "16px" },
-  paymentBtn: (active) => ({ flex: 1, padding: "10px 0", border: `1.5px solid ${active ? "#f97316" : "#e5e7eb"}`, borderRadius: "10px", backgroundColor: active ? "#fff8f0" : "#fff", color: active ? "#f97316" : "#6b7280", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }),
-  label: { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
-  input: { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "15px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" },
-  changeBox: { backgroundColor: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" },
-  changeLabel: { fontSize: "13px", color: "#16a34a", fontWeight: "600" },
-  changeAmt: { fontSize: "20px", fontWeight: "700", color: "#16a34a" },
-  // ── sticky confirm bar ──
-  stickyBar: {
-    position: "sticky", bottom: 0,
-    backgroundColor: "#fff",
-    borderTop: "1px solid #f3f4f6",
-    padding: "14px 0 32px",
-    marginTop: "8px",
-  },
-  confirmBtn: (disabled) => ({
-    width: "100%", padding: "15px",
-    backgroundColor: disabled ? "#d1d5db" : "#f97316",
-    border: "none", borderRadius: "14px", color: "#fff",
-    fontSize: "16px", fontWeight: "700",
-    cursor: disabled ? "not-allowed" : "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-  }),
-  successOverlay: { position: "fixed", inset: 0, backgroundColor: "#fff", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", fontFamily: "'DM Sans', sans-serif" },
-  successIcon: { width: "80px", height: "80px", borderRadius: "50%", backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" },
-  successTitle: { fontSize: "26px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px", textAlign: "center" },
-  successSub: { fontSize: "15px", color: "#9ca3af", marginBottom: "16px", textAlign: "center" },
-  successBadge: (color) => ({
-    backgroundColor: color === "green" ? "#f0fdf4" : color === "blue" ? "#eff6ff" : "#fff8f0",
-    border: `1.5px solid ${color === "green" ? "#86efac" : color === "blue" ? "#bfdbfe" : "#fed7aa"}`,
-    borderRadius: "12px", padding: "12px 20px",
-    fontSize: "15px", fontWeight: "600",
-    color: color === "green" ? "#16a34a" : color === "blue" ? "#1d4ed8" : "#f97316",
-    marginBottom: "28px", textAlign: "center",
-  }),
-  newSaleBtn: { width: "100%", maxWidth: "320px", padding: "15px", backgroundColor: "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  emptyCart: { textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: "14px" },
-  customerOption: (active) => ({ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "12px", border: `1.5px solid ${active ? "#f97316" : "#e5e7eb"}`, backgroundColor: active ? "#fff8f0" : "#fff", marginBottom: "8px", cursor: "pointer" }),
-  customerOptionName: { fontSize: "14px", fontWeight: "600", color: "#1a1a2e" },
-  customerOptionBalance: { fontSize: "12px", color: "#9ca3af" },
-  qtyPickerWrap: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 40px" },
-  qtyPickerRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: "24px", margin: "20px 0 12px" },
-  qtyPickerBtn: { width: "52px", height: "52px", borderRadius: "50%", border: "2px solid #f97316", backgroundColor: "#fff", color: "#f97316", fontSize: "26px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" },
-  qtyPickerNum: { fontSize: "56px", fontWeight: "700", color: "#1a1a2e", minWidth: "90px", textAlign: "center" },
-  qtyPickerUnit: { textAlign: "center", fontSize: "13px", color: "#9ca3af", marginBottom: "4px" },
-  qtyPickerPrice: { textAlign: "center", fontSize: "20px", fontWeight: "700", color: "#f97316", marginBottom: "16px" },
-  packShortcutBtn: { padding: "10px 16px", borderRadius: "12px", border: "1.5px solid #bfdbfe", backgroundColor: "#eff6ff", color: "#3b82f6", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "100%", marginBottom: "12px", textAlign: "center" },
-  shortcutsRow: { display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap", marginBottom: "20px" },
-  shortcutBtn: (active) => ({ padding: "6px 14px", borderRadius: "20px", border: `1.5px solid ${active ? "#f97316" : "#e5e7eb"}`, backgroundColor: active ? "#fff8f0" : "#fff", color: active ? "#f97316" : "#6b7280", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }),
-  qtyAddBtn: { width: "100%", padding: "15px", backgroundColor: "#f97316", border: "none", borderRadius: "14px", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-};
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -204,144 +59,125 @@ export default function Checkout() {
   const [selectedUtangCustomer, setSelectedUtangCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [toasts, setToasts] = useState([]);
   const [pickerProduct, setPickerProduct] = useState(null);
   const [pickerQty, setPickerQty] = useState(1);
 
-  const showToast = (type, title, subtitle) => setToast({ type, title, subtitle });
+  const showToast = (message, type = "success") => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
 
   useEffect(() => { fetchProducts(); fetchUtangCustomers(); }, []);
-
-  const fetchProducts = async () => {
-    try { const res = await axios.get(`${BASE_URL}/products`); setProducts(res.data); }
-    catch (err) { console.error(err); }
-  };
-
-  const fetchUtangCustomers = async () => {
-    try { const res = await axios.get(`${BASE_URL}/utang/customers`); setUtangCustomers(res.data); }
-    catch (err) { console.error(err); }
-  };
+  const fetchProducts = async () => { try { const r = await axios.get(`${BASE_URL}/products`); setProducts(r.data); } catch(e){console.error(e);} };
+  const fetchUtangCustomers = async () => { try { const r = await axios.get(`${BASE_URL}/utang/customers`); setUtangCustomers(r.data); } catch(e){console.error(e);} };
 
   const handleProductTap = (product) => {
     const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
     if (isBulk) {
-      const existing = cart[product._id];
       setPickerProduct(product);
-      setPickerQty(existing ? existing.qty : 1);
+      setPickerQty(cart[product._id]?.qty ?? 1);
       setModal("qtyPicker");
     } else {
       setCart(prev => {
-        const existing = prev[product._id];
-        const newQty = (existing ? existing.qty : 0) + 1;
-        if (newQty > parseInt(product.stock)) return prev;
-        return { ...prev, [product._id]: { product, qty: newQty } };
+        const q = (prev[product._id]?.qty ?? 0) + 1;
+        if (q > parseInt(product.stock)) return prev;
+        return { ...prev, [product._id]: { product, qty: q } };
       });
+      showToast(`${product.name} added!`);
     }
   };
 
   const confirmPicker = () => {
     if (!pickerProduct || pickerQty < 1) return;
     setCart(prev => ({ ...prev, [pickerProduct._id]: { product: pickerProduct, qty: pickerQty } }));
-    setModal(null);
-    setPickerProduct(null);
+    showToast(`${pickerQty} pc${pickerQty!==1?"s":""} added!`);
+    setModal(null); setPickerProduct(null);
   };
 
-  const addWholePack = (packs = 1) => {
-    if (!pickerProduct) return;
-    const pcsPerUnit = parseInt(pickerProduct.pcsPerUnit) || 1;
-    const newQty = packs * pcsPerUnit;
-    if (newQty <= parseInt(pickerProduct.stock)) setPickerQty(newQty);
+  const addWholePack = (packs) => {
+    const n = packs * (parseInt(pickerProduct?.pcsPerUnit) || 1);
+    if (n <= parseInt(pickerProduct?.stock)) setPickerQty(n);
   };
 
-  const updateQty = (productId, delta) => {
+  const updateQty = (id, delta) => {
     setCart(prev => {
-      const item = prev[productId];
-      if (!item) return prev;
-      const newQty = item.qty + delta;
-      if (newQty <= 0) { const u = { ...prev }; delete u[productId]; return u; }
-      if (newQty > parseInt(item.product.stock)) return prev;
-      return { ...prev, [productId]: { ...item, qty: newQty } };
+      const item = prev[id]; if (!item) return prev;
+      const q = item.qty + delta;
+      if (q <= 0) { const u={...prev}; delete u[id]; return u; }
+      if (q > parseInt(item.product.stock)) return prev;
+      return { ...prev, [id]: { ...item, qty: q } };
     });
   };
 
   const cartItems = Object.values(cart);
-  const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
-  const subtotal = cartItems.reduce((sum, i) => sum + getSellingPrice(i.product) * i.qty, 0);
-  const cashPaid = parseFloat(cashInput) || 0;
-  const change = cashPaid - subtotal;
+  const cartCount = cartItems.reduce((s,i) => s+i.qty, 0);
+  const subtotal  = cartItems.reduce((s,i) => s+getSellingPrice(i.product)*i.qty, 0);
+  const cashPaid  = parseFloat(cashInput) || 0;
+  const change    = cashPaid - subtotal;
+  const confirmDisabled = loading || (paymentMode==="cash" && cashPaid<subtotal) || (paymentMode==="utang" && !selectedUtangCustomer);
 
   const handleConfirm = async () => {
-    if (cartItems.length === 0) return;
-    if (paymentMode === "cash" && cashPaid < subtotal) return;
-    if (paymentMode === "utang" && !selectedUtangCustomer) return;
+    if (!cartItems.length) return;
+    if (paymentMode==="cash" && cashPaid<subtotal) { showToast("Cash received is not enough.", "error"); return; }
+    if (paymentMode==="utang" && !selectedUtangCustomer) { showToast("Please select a customer.", "error"); return; }
     setLoading(true);
     try {
       for (const { product, qty } of cartItems) {
-        await axios.post(`${BASE_URL}/sales`, {
-          productId: product._id,
-          productName: product.name,
-          qty,
-          unitPrice: getSellingPrice(product),
-          saleDate: new Date().toISOString(),
-        });
+        await axios.post(`${BASE_URL}/sales`, { productId:product._id, productName:product.name, qty, unitPrice:getSellingPrice(product), saleDate:new Date().toISOString() });
       }
-      if (paymentMode === "utang" && selectedUtangCustomer) {
-        await axios.post(`${BASE_URL}/utang/customers/${selectedUtangCustomer._id}/add`, {
-          amount: subtotal,
-          notes: `Checkout: ${cartItems.map(i => `${i.product.name} x${i.qty}pcs`).join(", ")}`,
-        });
+      if (paymentMode==="utang" && selectedUtangCustomer) {
+        await axios.post(`${BASE_URL}/utang/customers/${selectedUtangCustomer._id}/add`, { amount:subtotal, notes:`Checkout: ${cartItems.map(i=>`${i.product.name} x${i.qty}pcs`).join(", ")}` });
       }
-      setSuccessData({
-        total: subtotal, change: paymentMode === "cash" ? change : 0,
-        paymentMode, customerName: selectedUtangCustomer?.customerName || null, itemCount: cartCount,
-      });
-      setModal("success");
-      setCart({}); setCashInput(""); setSelectedUtangCustomer(null);
+      setSuccessData({ total:subtotal, change:paymentMode==="cash"?change:0, paymentMode, customerName:selectedUtangCustomer?.customerName||null, itemCount:cartCount });
+      setModal("success"); setCart({}); setCashInput(""); setSelectedUtangCustomer(null);
       fetchProducts();
-    } catch (err) {
-      console.error(err);
-      showToast("error", "Checkout Failed", "Something went wrong. Please try again.");
+    } catch(err) {
+      console.error(err); showToast("Checkout failed. Try again.", "error");
     } finally { setLoading(false); }
   };
 
   const resetCheckout = () => { setModal(null); setSuccessData(null); setPaymentMode("cash"); };
+  const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && (activeCategory==="All" || p.category===activeCategory));
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) &&
-    (activeCategory === "All" || p.category === activeCategory)
-  );
+  const chip = (active) => ({ flexShrink:0, padding:"6px 16px", borderRadius:"20px", border:"1.5px solid", borderColor:active?"#f97316":"#ddd", backgroundColor:active?"#f97316":"#fff", color:active?"#fff":"#666", fontSize:"13px", fontWeight:active?"600":"400", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", whiteSpace:"nowrap" });
+  const payBtn = (active) => ({ flex:1, padding:"10px 0", border:`1.5px solid ${active?"#f97316":"#e5e7eb"}`, borderRadius:"10px", backgroundColor:active?"#fff8f0":"#fff", color:active?"#f97316":"#6b7280", fontSize:"13px", fontWeight:"600", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" });
 
   return (
     <>
+      <style>{`
+        @keyframes slideDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
+        .modal-sheet { display:flex; flex-direction:column; background:#fff; border-radius:24px 24px 0 0; width:100%; height:88vh; overflow:hidden; }
+        .modal-body  { flex:1; overflow-y:auto; padding:24px 20px 8px; -webkit-overflow-scrolling:touch; }
+        .modal-footer{ flex-shrink:0; padding:12px 20px; padding-bottom:max(20px,env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #f0f0f0; }
+      `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toasts={toasts} />
 
-      <div style={S.page}>
+      <div style={{ backgroundColor:"#f5f6fa", minHeight:"100vh", fontFamily:"'DM Sans',sans-serif", paddingBottom:"180px" }}>
+
         {/* Header */}
-        <div style={S.header}>
-          <div style={S.headerTop}><h1 style={S.title}>Checkout</h1></div>
-          <div style={S.subtitle}>Tap products to add to cart</div>
+        <div style={{ padding:"20px 20px 12px", backgroundColor:"#f5f6fa", position:"sticky", top:0, zIndex:10 }}>
+          <h1 style={{ fontSize:"24px", fontWeight:"700", color:"#1a1a2e", margin:"0 0 2px" }}>Checkout</h1>
+          <div style={{ fontSize:"13px", color:"#9ca3af" }}>Tap products to add to cart</div>
         </div>
 
         {/* Search */}
-        <div style={S.searchWrapper}>
-          <div style={S.searchBox}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input style={S.searchInput} placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div style={{ padding:"4px 20px 8px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"10px", backgroundColor:"#eef0f5", borderRadius:"14px", padding:"10px 16px" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input style={{ border:"none", background:"transparent", outline:"none", fontSize:"14px", color:"#333", width:"100%", fontFamily:"'DM Sans',sans-serif" }} placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
         {/* Categories */}
-        <div style={S.categoryScroll}>
-          {CATEGORIES.map(cat => (
-            <button key={cat} style={S.categoryChip(activeCategory === cat)} onClick={() => setActiveCategory(cat)}>{cat}</button>
-          ))}
+        <div style={{ display:"flex", gap:"8px", overflowX:"auto", padding:"4px 20px 10px", scrollbarWidth:"none" }}>
+          {CATEGORIES.map(cat => <button key={cat} style={chip(activeCategory===cat)} onClick={() => setActiveCategory(cat)}>{cat}</button>)}
         </div>
 
         {/* Product Grid */}
-        <div style={S.productGrid}>
+        <div style={{ padding:"0 16px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
           {filtered.map(product => {
             const sp = getSellingPrice(product);
             const cartItem = cart[product._id];
@@ -349,27 +185,21 @@ export default function Checkout() {
             const outOfStock = parseInt(product.stock) <= 0;
             const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
             return (
-              <div key={product._id} style={S.productCard(inCart)}>
-                {getImageUrl(product.image)
-                  ? <img src={getImageUrl(product.image)} alt={product.name} style={S.productImg} />
-                  : <div style={S.productImgPlaceholder}>📦</div>
-                }
-                {inCart && <div style={S.cartBadge}>{cartItem.qty} pcs</div>}
-                <div style={S.productBody}>
-                  <p style={S.productName}>{product.name}</p>
-                  {isBulk && <div style={S.bulkBadge}>📦 {product.pcsPerUnit} pcs/{product.unit}</div>}
-                  <div style={S.priceRow}>
-                    <span style={S.price}>₱{sp}<span style={{ fontSize: "10px", color: "#fb923c" }}>/pc</span></span>
-                    <span style={S.stockLabel}>{product.stock} pcs</span>
+              <div key={product._id} style={{ backgroundColor:"#fff", borderRadius:"16px", overflow:"hidden", boxShadow:inCart?"0 0 0 2px #f97316":"0 1px 4px rgba(0,0,0,0.07)", position:"relative" }}>
+                {getImageUrl(product.image) ? <img src={getImageUrl(product.image)} alt={product.name} style={{ width:"100%", height:"130px", objectFit:"cover", display:"block" }} /> : <div style={{ width:"100%", height:"130px", backgroundColor:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"32px" }}>📦</div>}
+                {inCart && <div style={{ position:"absolute", top:"8px", right:"8px", backgroundColor:"#f97316", color:"#fff", borderRadius:"99px", fontSize:"11px", fontWeight:"700", padding:"2px 7px" }}>{cartItem.qty} pcs</div>}
+                <div style={{ padding:"10px 12px 12px" }}>
+                  <p style={{ fontSize:"13px", fontWeight:"600", color:"#1a1a2e", margin:"0 0 4px", lineHeight:"1.3", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{product.name}</p>
+                  {isBulk && <div style={{ display:"inline-block", backgroundColor:"#eff6ff", color:"#3b82f6", fontSize:"10px", fontWeight:"700", padding:"2px 6px", borderRadius:"6px", marginBottom:"5px" }}>📦 {product.pcsPerUnit} pcs/{product.unit}</div>}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                    <span style={{ fontSize:"15px", fontWeight:"700", color:"#f97316" }}>₱{sp}<span style={{ fontSize:"10px", color:"#fb923c" }}>/pc</span></span>
+                    <span style={{ fontSize:"11px", color:"#9ca3af" }}>{product.stock} pcs</span>
                   </div>
-                  <button style={S.addBtn(inCart)} onClick={() => handleProductTap(product)} disabled={outOfStock}>
-                    {inCart
-                      ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{isBulk ? "Change Qty" : "Add More"}</>
-                      : <>+ Add</>
-                    }
+                  <button style={{ width:"100%", padding:"8px 0", backgroundColor:inCart?"#fff8f0":"#f97316", border:inCart?"1.5px solid #f97316":"none", borderRadius:"10px", color:inCart?"#f97316":"#fff", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }} onClick={() => handleProductTap(product)} disabled={outOfStock}>
+                    {inCart ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{isBulk?"Change Qty":"Add More"}</> : <>+ Add</>}
                   </button>
                 </div>
-                {outOfStock && <div style={S.outOfStock}><span style={S.outOfStockText}>Out of Stock</span></div>}
+                {outOfStock && <div style={{ position:"absolute", top:0, left:0, right:0, bottom:0, backgroundColor:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", borderRadius:"16px" }}><span style={{ backgroundColor:"#fee2e2", color:"#ef4444", fontSize:"12px", fontWeight:"700", padding:"4px 10px", borderRadius:"99px" }}>Out of Stock</span></div>}
               </div>
             );
           })}
@@ -377,222 +207,182 @@ export default function Checkout() {
 
         {/* Cart Bar */}
         {cartCount > 0 && modal !== "cart" && (
-          <div style={S.cartBar}>
-            <div style={S.cartBarRow}>
+          <div style={{ position:"fixed", bottom:"70px", left:0, right:0, backgroundColor:"#1a1a2e", borderRadius:"20px 20px 0 0", padding:"16px 20px", zIndex:50, boxShadow:"0 -4px 20px rgba(0,0,0,0.15)" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
               <div>
-                <div style={S.cartBarLabel}>Total Amount</div>
-                <div style={S.cartBarTotal}>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+                <div style={{ fontSize:"13px", color:"rgba(255,255,255,0.6)" }}>Total Amount</div>
+                <div style={{ fontSize:"22px", fontWeight:"700", color:"#fff" }}>₱{subtotal.toLocaleString("en-PH",{minimumFractionDigits:0})}</div>
               </div>
-              <span style={{ backgroundColor: "#f97316", color: "#fff", borderRadius: "99px", padding: "2px 10px", fontSize: "13px", fontWeight: "700" }}>
-                {cartCount} pc{cartCount !== 1 ? "s" : ""}
-              </span>
+              <span style={{ backgroundColor:"#f97316", color:"#fff", borderRadius:"99px", padding:"2px 10px", fontSize:"13px", fontWeight:"700" }}>{cartCount} pc{cartCount!==1?"s":""}</span>
             </div>
-            <button style={S.viewCartBtn} onClick={() => setModal("cart")}>
+            <button style={{ width:"100%", padding:"14px", backgroundColor:"#f97316", border:"none", borderRadius:"14px", color:"#fff", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", justifyContent:"space-between" }} onClick={() => setModal("cart")}>
               <span>Review &amp; Pay</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
         )}
 
-        {/* Qty Picker Modal */}
+        {/* Qty Picker */}
         {modal === "qtyPicker" && pickerProduct && (() => {
           const pcsPerUnit = parseInt(pickerProduct.pcsPerUnit) || 1;
           const maxStock = parseInt(pickerProduct.stock);
           const maxPacks = Math.floor(maxStock / pcsPerUnit);
           const pricePerPc = getSellingPrice(pickerProduct);
-          const pricePerPack = pricePerPc * pcsPerUnit;
           return (
-            <div style={S.overlay} onClick={e => e.target === e.currentTarget && setModal(null)}>
-              <div style={S.qtyPickerWrap}>
-                <div style={S.modalHeader}>
+            <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.5)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target===e.currentTarget && setModal(null)}>
+              <div style={{ backgroundColor:"#fff", borderRadius:"24px 24px 0 0", width:"100%", padding:"24px 20px 40px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
                   <div>
-                    <h2 style={S.modalTitle}>{pickerProduct.name}</h2>
-                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#9ca3af" }}>
-                      {maxStock} pcs available · ₱{pricePerPc}/pc
-                    </p>
+                    <h2 style={{ fontSize:"20px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>{pickerProduct.name}</h2>
+                    <p style={{ margin:"2px 0 0", fontSize:"12px", color:"#9ca3af" }}>{maxStock} pcs available · ₱{pricePerPc}/pc</p>
                   </div>
-                  <button style={S.closeBtn} onClick={() => setModal(null)}>✕</button>
+                  <button style={{ background:"none", border:"none", fontSize:"22px", color:"#9ca3af", cursor:"pointer" }} onClick={() => setModal(null)}>✕</button>
                 </div>
                 {maxPacks >= 1 && (
-                  <div style={{ marginBottom: "16px" }}>
-                    <div style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quick Add</div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      {[1, 2, 3].filter(n => n <= maxPacks).map(n => (
-                        <button key={n} style={S.packShortcutBtn} onClick={() => addWholePack(n)}>
-                          📦 {n} whole {pickerProduct.unit}{n > 1 ? "s" : ""} = {n * pcsPerUnit} pcs · ₱{(pricePerPack * n).toLocaleString("en-PH", { minimumFractionDigits: 0 })}
+                  <div style={{ marginBottom:"16px" }}>
+                    <div style={{ fontSize:"12px", color:"#9ca3af", fontWeight:"600", marginBottom:"8px", textTransform:"uppercase" }}>Quick Add</div>
+                    <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                      {[1,2,3].filter(n => n<=maxPacks).map(n => (
+                        <button key={n} style={{ padding:"10px 16px", borderRadius:"12px", border:"1.5px solid #bfdbfe", backgroundColor:"#eff6ff", color:"#3b82f6", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", flex:1, textAlign:"center" }} onClick={() => addWholePack(n)}>
+                          📦 {n} {pickerProduct.unit}{n>1?"s":""} = {n*pcsPerUnit} pcs · ₱{(pricePerPc*pcsPerUnit*n).toLocaleString("en-PH",{minimumFractionDigits:0})}
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                  <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
-                  <span style={{ fontSize: "12px", color: "#9ca3af" }}>or choose pieces</span>
-                  <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
+                <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"16px" }}>
+                  <div style={{ flex:1, height:"1px", backgroundColor:"#e5e7eb" }}/><span style={{ fontSize:"12px", color:"#9ca3af" }}>or choose pieces</span><div style={{ flex:1, height:"1px", backgroundColor:"#e5e7eb" }}/>
                 </div>
-                <div style={S.qtyPickerUnit}>Quantity (pcs)</div>
-                <div style={S.qtyPickerRow}>
-                  <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.max(1, v - 1))}>−</button>
-                  <div style={S.qtyPickerNum}>{pickerQty}</div>
-                  <button style={S.qtyPickerBtn} onClick={() => setPickerQty(v => Math.min(maxStock, v + 1))}>+</button>
+                <div style={{ textAlign:"center", fontSize:"13px", color:"#9ca3af", marginBottom:"4px" }}>Quantity (pcs)</div>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"24px", margin:"20px 0 12px" }}>
+                  <button style={{ width:"52px", height:"52px", borderRadius:"50%", border:"2px solid #f97316", backgroundColor:"#fff", color:"#f97316", fontSize:"26px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',sans-serif" }} onClick={() => setPickerQty(v => Math.max(1,v-1))}>−</button>
+                  <div style={{ fontSize:"56px", fontWeight:"700", color:"#1a1a2e", minWidth:"90px", textAlign:"center" }}>{pickerQty}</div>
+                  <button style={{ width:"52px", height:"52px", borderRadius:"50%", border:"2px solid #f97316", backgroundColor:"#fff", color:"#f97316", fontSize:"26px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',sans-serif" }} onClick={() => setPickerQty(v => Math.min(maxStock,v+1))}>+</button>
                 </div>
-                <div style={S.shortcutsRow}>
-                  {[1, 2, 3, 5, 10].filter(n => n <= maxStock).map(n => (
-                    <button key={n} style={S.shortcutBtn(pickerQty === n)} onClick={() => setPickerQty(n)}>
-                      {n} pc{n !== 1 ? "s" : ""}
-                    </button>
+                <div style={{ display:"flex", gap:"8px", justifyContent:"center", flexWrap:"wrap", marginBottom:"20px" }}>
+                  {[1,2,3,5,10].filter(n => n<=maxStock).map(n => (
+                    <button key={n} style={{ padding:"6px 14px", borderRadius:"20px", border:`1.5px solid ${pickerQty===n?"#f97316":"#e5e7eb"}`, backgroundColor:pickerQty===n?"#fff8f0":"#fff", color:pickerQty===n?"#f97316":"#6b7280", fontSize:"13px", fontWeight:"600", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }} onClick={() => setPickerQty(n)}>{n} pc{n!==1?"s":""}</button>
                   ))}
                 </div>
-                <div style={S.qtyPickerPrice}>
-                  ₱{(pricePerPc * pickerQty).toLocaleString("en-PH", { minimumFractionDigits: 0 })} total
-                </div>
-                <button style={S.qtyAddBtn} onClick={confirmPicker}>
-                  Add {pickerQty} pc{pickerQty !== 1 ? "s" : ""} to Cart
+                <div style={{ textAlign:"center", fontSize:"20px", fontWeight:"700", color:"#f97316", marginBottom:"16px" }}>₱{(pricePerPc*pickerQty).toLocaleString("en-PH",{minimumFractionDigits:0})} total</div>
+                <button style={{ width:"100%", padding:"15px", backgroundColor:"#f97316", border:"none", borderRadius:"14px", color:"#fff", fontSize:"16px", fontWeight:"700", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }} onClick={confirmPicker}>
+                  Add {pickerQty} pc{pickerQty!==1?"s":""} to Cart
                 </button>
               </div>
             </div>
           );
         })()}
 
-        {/* Cart Modal */}
+        {/* Cart Modal — flex column with sticky confirm */}
         {modal === "cart" && (
-          <div style={S.overlay} onClick={e => e.target === e.currentTarget && setModal(null)}>
-            <div style={S.modal}>
-              <div style={S.modalHeader}>
-                <h2 style={S.modalTitle}>Your Cart</h2>
-                <button style={S.closeBtn} onClick={() => setModal(null)}>✕</button>
-              </div>
+          <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.5)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target===e.currentTarget && setModal(null)}>
+            <div className="modal-sheet">
 
-              {cartItems.length === 0 ? <div style={S.emptyCart}>Cart is empty</div> : (
-                <>
+              <div className="modal-body">
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
+                  <h2 style={{ fontSize:"20px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>Your Cart</h2>
+                  <button style={{ background:"none", border:"none", fontSize:"22px", color:"#9ca3af", cursor:"pointer" }} onClick={() => setModal(null)}>✕</button>
+                </div>
+
+                {cartItems.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"40px 0", color:"#9ca3af", fontSize:"14px" }}>Cart is empty</div>
+                ) : <>
                   {cartItems.map(({ product, qty }) => {
                     const sp = getSellingPrice(product);
                     const isBulk = BULK_UNITS.includes(product.unit) && product.pcsPerUnit;
                     return (
-                      <div key={product._id} style={S.cartItem}>
-                        {getImageUrl(product.image)
-                          ? <img src={getImageUrl(product.image)} alt={product.name} style={S.cartItemImg} />
-                          : <div style={{ ...S.cartItemImg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>📦</div>
-                        }
-                        <div style={S.cartItemInfo}>
-                          <p style={S.cartItemName}>{product.name}</p>
-                          <p style={S.cartItemSub}>₱{sp}/pc{isBulk ? ` · from ${product.unit}` : ""}</p>
+                      <div key={product._id} style={{ display:"flex", gap:"12px", alignItems:"center", padding:"12px 0", borderBottom:"1px solid #f3f4f6" }}>
+                        {getImageUrl(product.image) ? <img src={getImageUrl(product.image)} alt={product.name} style={{ width:"52px", height:"52px", borderRadius:"10px", objectFit:"cover", flexShrink:0 }} /> : <div style={{ width:"52px", height:"52px", borderRadius:"10px", backgroundColor:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", flexShrink:0 }}>📦</div>}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <p style={{ fontSize:"14px", fontWeight:"600", color:"#1a1a2e", margin:"0 0 2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{product.name}</p>
+                          <p style={{ fontSize:"11px", color:"#9ca3af", margin:0 }}>₱{sp}/pc{isBulk?` · from ${product.unit}`:""}</p>
                         </div>
-                        <div style={S.qtyControl}>
-                          <button style={S.qtyBtn} onClick={() => updateQty(product._id, -1)}>−</button>
-                          <span style={S.qtyNum}>{qty}<span style={{ fontSize: "9px", color: "#9ca3af" }}>pc</span></span>
-                          <button style={S.qtyBtn} onClick={() => updateQty(product._id, 1)}>+</button>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                          <button style={{ width:"28px", height:"28px", borderRadius:"50%", border:"1.5px solid #e5e7eb", backgroundColor:"#fff", cursor:"pointer", fontSize:"16px", fontWeight:"700", color:"#374151", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',sans-serif" }} onClick={() => updateQty(product._id,-1)}>−</button>
+                          <span style={{ fontSize:"15px", fontWeight:"700", color:"#1a1a2e", minWidth:"24px", textAlign:"center" }}>{qty}<span style={{ fontSize:"9px", color:"#9ca3af" }}>pc</span></span>
+                          <button style={{ width:"28px", height:"28px", borderRadius:"50%", border:"1.5px solid #e5e7eb", backgroundColor:"#fff", cursor:"pointer", fontSize:"16px", fontWeight:"700", color:"#374151", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',sans-serif" }} onClick={() => updateQty(product._id,1)}>+</button>
                         </div>
-                        <div style={S.cartItemTotal}>₱{(sp * qty).toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+                        <div style={{ fontSize:"15px", fontWeight:"700", color:"#1a1a2e", textAlign:"right", minWidth:"60px" }}>₱{(sp*qty).toLocaleString("en-PH",{minimumFractionDigits:0})}</div>
                       </div>
                     );
                   })}
 
-                  <div style={S.summaryBox}>
-                    <div style={S.summaryRow}>
-                      <span>{cartCount} pc{cartCount !== 1 ? "s" : ""}</span>
-                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
-                    </div>
-                    <div style={S.summaryTotal}>
-                      <span>Total</span>
-                      <span>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
-                    </div>
+                  {/* Summary */}
+                  <div style={{ backgroundColor:"#f9fafb", borderRadius:"14px", padding:"14px 16px", margin:"16px 0" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"13px", color:"#6b7280", marginBottom:"8px" }}><span>{cartCount} pc{cartCount!==1?"s":""}</span><span>₱{subtotal.toLocaleString("en-PH",{minimumFractionDigits:0})}</span></div>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"17px", fontWeight:"700", color:"#1a1a2e", borderTop:"1px solid #e5e7eb", paddingTop:"10px", marginTop:"4px" }}><span>Total</span><span>₱{subtotal.toLocaleString("en-PH",{minimumFractionDigits:0})}</span></div>
                   </div>
 
-                  <div style={S.sectionTitle}>Payment Method</div>
-                  <div style={S.paymentOptions}>
-                    <button style={S.paymentBtn(paymentMode === "cash")} onClick={() => setPaymentMode("cash")}>💵 Cash</button>
-                    <button style={S.paymentBtn(paymentMode === "utang")} onClick={() => setPaymentMode("utang")}>📒 Utang</button>
-                    <button style={S.paymentBtn(paymentMode === "gcash")} onClick={() => setPaymentMode("gcash")}>📱 GCash</button>
+                  {/* Payment */}
+                  <div style={{ fontSize:"14px", fontWeight:"700", color:"#374151", marginBottom:"10px" }}>Payment Method</div>
+                  <div style={{ display:"flex", gap:"8px", marginBottom:"16px" }}>
+                    <button style={payBtn(paymentMode==="cash")} onClick={() => setPaymentMode("cash")}>💵 Cash</button>
+                    <button style={payBtn(paymentMode==="utang")} onClick={() => setPaymentMode("utang")}>📒 Utang</button>
+                    <button style={payBtn(paymentMode==="gcash")} onClick={() => setPaymentMode("gcash")}>📱 GCash</button>
                   </div>
 
-                  {paymentMode === "cash" && (
-                    <>
-                      <label style={S.label}>Cash Received (₱)</label>
-                      <input style={S.input} type="number" placeholder="0" value={cashInput} onChange={e => setCashInput(e.target.value)} autoFocus />
-                      {cashPaid >= subtotal && (
-                        <div style={S.changeBox}>
-                          <span style={S.changeLabel}>Change</span>
-                          <span style={S.changeAmt}>₱{change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {paymentMode === "cash" && <>
+                    <label style={{ fontSize:"13px", fontWeight:"600", color:"#374151", marginBottom:"6px", display:"block" }}>Cash Received (₱)</label>
+                    <input style={{ width:"100%", border:"1.5px solid #e5e7eb", borderRadius:"10px", padding:"10px 14px", fontSize:"15px", fontFamily:"'DM Sans',sans-serif", color:"#1a1a2e", outline:"none", boxSizing:"border-box", backgroundColor:"#fff", marginBottom:"14px" }} type="number" placeholder="0" value={cashInput} onChange={e => setCashInput(e.target.value)} autoFocus />
+                    {cashPaid >= subtotal && (
+                      <div style={{ backgroundColor:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:"10px", padding:"12px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
+                        <span style={{ fontSize:"13px", color:"#16a34a", fontWeight:"600" }}>Change</span>
+                        <span style={{ fontSize:"20px", fontWeight:"700", color:"#16a34a" }}>₱{change.toLocaleString("en-PH",{minimumFractionDigits:0})}</span>
+                      </div>
+                    )}
+                  </>}
 
-                  {paymentMode === "gcash" && (
-                    <div style={{ backgroundColor: "#eff6ff", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", fontSize: "13px", color: "#1e40af" }}>
-                      📱 GCash payment of <strong>₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</strong> — confirm once received.
-                    </div>
-                  )}
+                  {paymentMode === "gcash" && <div style={{ backgroundColor:"#eff6ff", borderRadius:"10px", padding:"12px 14px", marginBottom:"14px", fontSize:"13px", color:"#1e40af" }}>📱 GCash payment of <strong>₱{subtotal.toLocaleString("en-PH",{minimumFractionDigits:0})}</strong> — confirm once received.</div>}
 
                   {paymentMode === "utang" && (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={S.sectionTitle}>Select Customer</div>
+                    <div style={{ marginBottom:"8px" }}>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#374151", marginBottom:"10px" }}>Select Customer</div>
                       {utangCustomers.length === 0
-                        ? <div style={{ fontSize: "13px", color: "#9ca3af" }}>No customers found. Add one in the Utang tab.</div>
+                        ? <div style={{ fontSize:"13px", color:"#9ca3af" }}>No customers yet. Add one in the Utang tab.</div>
                         : utangCustomers.map(c => {
-                            const balance = parseFloat(c.balance || 0);
-                            const limit = parseFloat(c.creditLimit || 1000);
-                            const wouldExceed = balance + subtotal > limit;
+                            const balance = parseFloat(c.balance||0), limit = parseFloat(c.creditLimit||1000);
+                            const exceed = balance+subtotal>limit;
                             return (
-                              <div key={c._id} style={S.customerOption(selectedUtangCustomer?._id === c._id)} onClick={() => setSelectedUtangCustomer(c)}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={S.customerOptionName}>{c.customerName}</div>
-                                  <div style={S.customerOptionBalance}>
-                                    Balance: ₱{balance.toFixed(0)} / Limit: ₱{limit.toFixed(0)}
-                                    {wouldExceed && <span style={{ color: "#ef4444", marginLeft: "6px" }}>⚠ Exceeds limit</span>}
-                                  </div>
+                              <div key={c._id} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"12px 14px", borderRadius:"12px", border:`1.5px solid ${selectedUtangCustomer?._id===c._id?"#f97316":"#e5e7eb"}`, backgroundColor:selectedUtangCustomer?._id===c._id?"#fff8f0":"#fff", marginBottom:"8px", cursor:"pointer" }} onClick={() => setSelectedUtangCustomer(c)}>
+                                <div style={{ flex:1 }}>
+                                  <div style={{ fontSize:"14px", fontWeight:"600", color:"#1a1a2e" }}>{c.customerName}</div>
+                                  <div style={{ fontSize:"12px", color:"#9ca3af" }}>Balance: ₱{balance.toFixed(0)} / Limit: ₱{limit.toFixed(0)}{exceed&&<span style={{ color:"#ef4444", marginLeft:"6px" }}>⚠ Exceeds limit</span>}</div>
                                 </div>
-                                {selectedUtangCustomer?._id === c._id && (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                )}
+                                {selectedUtangCustomer?._id===c._id && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                               </div>
                             );
                           })
                       }
                     </div>
                   )}
+                </>}
+              </div>
 
-                  {/* ── Sticky Confirm Button ── */}
-                  <div style={S.stickyBar}>
-                    <button
-                      style={S.confirmBtn(loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer))}
-                      onClick={handleConfirm}
-                      disabled={loading || (paymentMode === "cash" && cashPaid < subtotal) || (paymentMode === "utang" && !selectedUtangCustomer)}
-                    >
-                      {loading ? "Processing..." : `Confirm ${paymentMode === "cash" ? "Cash" : paymentMode === "gcash" ? "GCash" : "Utang"} Payment`}
-                    </button>
-                  </div>
-                </>
+              {/* ── STICKY CONFIRM BUTTON — always visible ── */}
+              {cartItems.length > 0 && (
+                <div className="modal-footer">
+                  <button style={{ width:"100%", padding:"16px", backgroundColor:confirmDisabled?"#d1d5db":"#f97316", border:"none", borderRadius:"14px", color:"#fff", fontSize:"16px", fontWeight:"700", cursor:confirmDisabled?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif" }} onClick={handleConfirm} disabled={confirmDisabled}>
+                    {loading ? "Processing..." : `Confirm ${paymentMode==="cash"?"💵 Cash":paymentMode==="gcash"?"📱 GCash":"📒 Utang"} Payment`}
+                  </button>
+                </div>
               )}
+
             </div>
           </div>
         )}
 
-        {/* ── Success Screen ── */}
+        {/* Success */}
         {modal === "success" && successData && (
-          <div style={S.successOverlay}>
-            <div style={S.successIcon}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          <div style={{ position:"fixed", inset:0, backgroundColor:"#fff", zIndex:300, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 24px", fontFamily:"'DM Sans',sans-serif" }}>
+            <div style={{ width:"80px", height:"80px", borderRadius:"50%", backgroundColor:"#f0fdf4", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"20px" }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div style={S.successTitle}>Sale Complete! 🎉</div>
-            <div style={S.successSub}>
-              {successData.itemCount} pc{successData.itemCount !== 1 ? "s" : ""} sold &nbsp;·&nbsp; ₱{successData.total.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
-            </div>
-
-            {successData.paymentMode === "cash" && (
-              <div style={S.successBadge("green")}>
-                💵 Cash received &nbsp;·&nbsp; Change: ₱{successData.change.toLocaleString("en-PH", { minimumFractionDigits: 0 })}
-              </div>
-            )}
-            {successData.paymentMode === "gcash" && (
-              <div style={S.successBadge("blue")}>📱 GCash payment received</div>
-            )}
-            {successData.paymentMode === "utang" && (
-              <div style={S.successBadge("orange")}>📒 Added to {successData.customerName}'s utang</div>
-            )}
-
-            <button style={S.newSaleBtn} onClick={resetCheckout}>+ New Sale</button>
+            <div style={{ fontSize:"26px", fontWeight:"700", color:"#1a1a2e", marginBottom:"8px", textAlign:"center" }}>Sale Complete! 🎉</div>
+            <div style={{ fontSize:"15px", color:"#9ca3af", marginBottom:"32px", textAlign:"center" }}>{successData.itemCount} pc{successData.itemCount!==1?"s":""} sold · ₱{successData.total.toLocaleString("en-PH",{minimumFractionDigits:0})}</div>
+            {successData.paymentMode==="cash" && successData.change>=0 && <div style={{ fontSize:"16px", fontWeight:"600", color:"#16a34a", marginBottom:"32px" }}>💵 Change: ₱{successData.change.toLocaleString("en-PH",{minimumFractionDigits:0})}</div>}
+            {successData.paymentMode==="utang" && <div style={{ fontSize:"16px", fontWeight:"600", color:"#16a34a", marginBottom:"32px" }}>📒 Added to {successData.customerName}'s utang</div>}
+            {successData.paymentMode==="gcash" && <div style={{ fontSize:"16px", fontWeight:"600", color:"#16a34a", marginBottom:"32px" }}>📱 GCash payment received</div>}
+            <button style={{ width:"100%", maxWidth:"320px", padding:"15px", backgroundColor:"#f97316", border:"none", borderRadius:"14px", color:"#fff", fontSize:"16px", fontWeight:"700", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }} onClick={resetCheckout}>New Sale</button>
           </div>
         )}
       </div>
