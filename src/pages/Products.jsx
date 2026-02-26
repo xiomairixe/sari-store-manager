@@ -13,7 +13,7 @@ const getImageUrl = (image) => {
 };
 
 const CATEGORIES = [
-  "All","Snacks","Beverages","Candies","Cigarettes","Seasonings",
+  "All","Snacks","Beverages","Candies","Cigarettes","Diaper","Coffee","Seasonings",
   "Noodles","Canned Goods","Personal Care","Household",
   "School & Office Supplies","General Merchandise","Other",
 ];

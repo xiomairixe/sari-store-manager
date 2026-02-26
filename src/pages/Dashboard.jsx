@@ -55,11 +55,13 @@ export default function Dashboard() {
     try {
       // ⚠️ NOTE: /stats endpoint needs to be added to server.js
       // For now, fetching sales and products directly as fallback
-      const [salesRes, productsRes] = await Promise.all([
+      const [salesRes, productsRes, utangRes] = await Promise.all([
         axios.get(`${BASE_URL}/sales`),
         axios.get(`${BASE_URL}/products`),
+        axios.get(`${BASE_URL}/utang/customers`),
       ]);
 
+      const totalUtang = utangRes.data.reduce((sum, c) => sum + parseFloat(c.balance || 0), 0);
       const sales = salesRes.data;
       const products = productsRes.data;
       const now = new Date();
@@ -84,7 +86,7 @@ export default function Dashboard() {
         todaySales,
         netProfitMo: thisMonthSales,
         totalItems: products.length,
-        totalUtang: 0,
+        totalUtang,   // ← was hardcoded 0
         lowStock,
         expiringSoon,
       });
