@@ -56,7 +56,9 @@ const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
       <div style={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-        <p style={{ margin: 0, fontSize: "13px", fontWeight: "600" }}>{payload[0].name} : ₱{parseFloat(payload[0].value).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
+        <p style={{ margin: 0, fontSize: "13px", fontWeight: "600" }}>
+          {payload[0].name} : ₱{parseFloat(payload[0].value).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+        </p>
       </div>
     );
   }
@@ -89,7 +91,9 @@ export default function Costs() {
     setSubmitting(true);
     try {
       await axios.post(`${BASE_URL}/costs`, form);
-      setShowModal(false); setForm(emptyForm); fetchCosts();
+      setShowModal(false);
+      setForm(emptyForm);
+      fetchCosts();
     } catch (err) { console.error(err); } finally { setSubmitting(false); }
   };
 
@@ -112,12 +116,11 @@ export default function Costs() {
     value: thisMonthCosts.filter(c => c.category === cat).reduce((sum, c) => sum + parseFloat(c.amount || 0), 0),
   })).filter(d => d.value > 0);
 
-  // Recent = sorted costs for selected month
   const recent = [...thisMonthCosts].sort((a, b) => new Date(b.costDate) - new Date(a.costDate));
 
-  const monthOptions = require ? null : null; // just use label from MonthFilter
-  const [y, m] = selectedMonth.split("-").map(Number);
-  const selectedMonthLabel = new Date(y, m - 1, 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+  // ── Month label — pure JS, no require ───────────────────────────────────
+  const [selY, selM] = selectedMonth.split("-").map(Number);
+  const selectedMonthLabel = new Date(selY, selM - 1, 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
 
   return (
     <>
@@ -133,10 +136,23 @@ export default function Costs() {
         <div style={S.body}>
           {/* Financial Summary */}
           <div style={S.card}>
-            <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "6px" }}>Financial Summary · {selectedMonthLabel}</div>
-            <div style={S.summaryRow}><span style={S.summaryKey}>Revenue</span><span style={S.summaryRevenue}>₱{revenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
-            <div style={S.summaryRow}><span style={S.summaryKey}>Expenses</span><span style={S.summaryExpense}>-₱{expenses.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
-            <div style={S.profitRow}><span style={S.profitKey}>Net Profit</span><span style={{ fontSize: "16px", fontWeight: "700", color: netProfit >= 0 ? "#16a34a" : "#ef4444" }}>₱{netProfit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span></div>
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "6px" }}>
+              Financial Summary · {selectedMonthLabel}
+            </div>
+            <div style={S.summaryRow}>
+              <span style={S.summaryKey}>Revenue</span>
+              <span style={S.summaryRevenue}>₱{revenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div style={S.summaryRow}>
+              <span style={S.summaryKey}>Expenses</span>
+              <span style={S.summaryExpense}>-₱{expenses.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div style={S.profitRow}>
+              <span style={S.profitKey}>Net Profit</span>
+              <span style={{ fontSize: "16px", fontWeight: "700", color: netProfit >= 0 ? "#16a34a" : "#ef4444" }}>
+                ₱{netProfit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
 
           {/* Pie Chart */}
@@ -175,7 +191,7 @@ export default function Costs() {
               recent.map((cost) => {
                 const color = CATEGORY_COLORS[cost.category] || "#9ca3af";
                 return (
-                  <div key={cost.id} style={S.expenseItem}>
+                  <div key={cost._id || cost.id} style={S.expenseItem}>
                     <div style={S.iconBox(color)}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
@@ -186,10 +202,12 @@ export default function Costs() {
                       <p style={S.expenseDesc}>{cost.description}</p>
                     </div>
                     <div style={S.expenseRight}>
-                      <div style={S.expenseAmount}>₱{parseFloat(cost.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                      <div style={S.expenseAmount}>
+                        ₱{parseFloat(cost.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      </div>
                       <div style={S.expenseDate}>{formatDate(cost.costDate)}</div>
                     </div>
-                    <button style={S.deleteBtn} onClick={() => setDeleteTarget(cost.id)}>🗑</button>
+                    <button style={S.deleteBtn} onClick={() => setDeleteTarget(cost._id || cost.id)}>🗑</button>
                   </div>
                 );
               })
@@ -207,8 +225,14 @@ export default function Costs() {
               <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px" }}>Delete Expense?</div>
               <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "24px" }}>This action cannot be undone.</div>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", fontSize: "14px", fontWeight: "600", color: "#374151", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-                <button onClick={handleDelete} style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "none", backgroundColor: "#ef4444", fontSize: "14px", fontWeight: "700", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Delete</button>
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", fontSize: "14px", fontWeight: "600", color: "#374151", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                >Cancel</button>
+                <button
+                  onClick={handleDelete}
+                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "none", backgroundColor: "#ef4444", fontSize: "14px", fontWeight: "700", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                >Delete</button>
               </div>
             </div>
           </div>
@@ -225,25 +249,46 @@ export default function Costs() {
                 </div>
                 <form id="expense-form" onSubmit={handleSubmit}>
                   <label style={S.label}>Description</label>
-                  <input style={S.input} placeholder="e.g. Meralco Bill" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                  <input
+                    style={S.input}
+                    placeholder="e.g. Meralco Bill"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  />
                   <div style={S.row2}>
                     <div>
                       <label style={S.label}>Amount</label>
-                      <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                      <input
+                        style={S.input}
+                        type="number" step="0.01" placeholder="0.00"
+                        value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                      />
                     </div>
                     <div>
                       <label style={S.label}>Category</label>
-                      <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                      <select
+                        style={S.input}
+                        value={form.category}
+                        onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      >
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
                   <label style={S.label}>Date</label>
-                  <input style={{ ...S.input, marginBottom: "4px" }} type="date" value={form.costDate} onChange={(e) => setForm({ ...form, costDate: e.target.value })} />
+                  <input
+                    style={{ ...S.input, marginBottom: "4px" }}
+                    type="date"
+                    value={form.costDate}
+                    onChange={(e) => setForm({ ...form, costDate: e.target.value })}
+                  />
                 </form>
               </div>
               <div style={S.submitBtnWrap}>
-                <button type="submit" form="expense-form" style={S.submitBtn} disabled={submitting}>{submitting ? "Saving..." : "💾 Save Expense"}</button>
+                <button type="submit" form="expense-form" style={S.submitBtn} disabled={submitting}>
+                  {submitting ? "Saving..." : "💾 Save Expense"}
+                </button>
               </div>
             </div>
           </div>
