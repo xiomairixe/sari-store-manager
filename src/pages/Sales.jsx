@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import MonthFilter, { getMonthOptions, getCurrentMonthValue, filterByMonth } from "./MonthFilter";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// Confirmed sales stored in localStorage — no backend changes needed
 const CONFIRMED_KEY = "sari_confirmed_sales";
 const loadConfirmed = () => { try { return JSON.parse(localStorage.getItem(CONFIRMED_KEY) || "{}"); } catch { return {}; } };
 const saveConfirmed = (d) => localStorage.setItem(CONFIRMED_KEY, JSON.stringify(d));
@@ -12,6 +12,7 @@ const saveConfirmed = (d) => localStorage.setItem(CONFIRMED_KEY, JSON.stringify(
 const S = {
   page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
   header: { padding: "20px 20px 10px", backgroundColor: "#f5f6fa", position: "sticky", top: 0, zIndex: 10 },
+  headerRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   body: { padding: "0 16px", display: "flex", flexDirection: "column", gap: "14px" },
   tabBar: { backgroundColor: "#fff", borderRadius: "14px", display: "flex", padding: "4px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
@@ -69,29 +70,19 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// ── Record Row: system total vs confirmed actual ──
 function RecordRow({ r, confirmed, onConfirm, onReview }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState(confirmed != null ? String(confirmed) : "");
   const inputRef = useRef(null);
-
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
   const hasConfirmed = confirmed != null;
   const diff = hasConfirmed ? confirmed - r.systemTotal : null;
   const matched = diff === 0;
   const over = diff > 0;
-
-  const commit = () => {
-    const val = parseFloat(inputVal);
-    onConfirm(r.date, isNaN(val) ? null : val);
-    setEditing(false);
-  };
+  const commit = () => { const val = parseFloat(inputVal); onConfirm(r.date, isNaN(val) ? null : val); setEditing(false); };
 
   return (
     <div style={{ padding: "14px 0", borderBottom: "1px solid #f3f4f6" }}>
-
-      {/* Top: date + review arrow */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <div style={{ cursor: "pointer" }} onClick={onReview}>
           <div style={{ fontSize: "15px", fontWeight: "600", color: "#1a1a2e" }}>{formatDate(r.date)}</div>
@@ -101,82 +92,34 @@ function RecordRow({ r, confirmed, onConfirm, onReview }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-
-      {/* System vs Actual side by side */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
-
-        {/* System (from checkout) */}
         <div style={{ backgroundColor: "#f9fafb", borderRadius: "12px", padding: "10px 12px" }}>
           <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>System</div>
-          <div style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e" }}>
-            ₱{r.systemTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-          </div>
+          <div style={{ fontSize: "16px", fontWeight: "700", color: "#1a1a2e" }}>₱{r.systemTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
           <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>from checkout</div>
         </div>
-
-        {/* Actual (manually confirmed) */}
-        <div style={{
-          backgroundColor: hasConfirmed ? (matched ? "#f0fdf4" : over ? "#eff6ff" : "#fff1f2") : "#fff",
-          border: hasConfirmed ? `1.5px solid ${matched ? "#86efac" : over ? "#bfdbfe" : "#fecaca"}` : "1.5px dashed #e5e7eb",
-          borderRadius: "12px", padding: "10px 12px", cursor: "pointer",
-        }}
-          onClick={() => { setInputVal(confirmed != null ? String(confirmed) : ""); setEditing(true); }}
-        >
-          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>
-            Actual {hasConfirmed && <span style={{ color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>✓</span>}
-          </div>
+        <div style={{ backgroundColor: hasConfirmed ? (matched ? "#f0fdf4" : over ? "#eff6ff" : "#fff1f2") : "#fff", border: hasConfirmed ? `1.5px solid ${matched ? "#86efac" : over ? "#bfdbfe" : "#fecaca"}` : "1.5px dashed #e5e7eb", borderRadius: "12px", padding: "10px 12px", cursor: "pointer" }} onClick={() => { setInputVal(confirmed != null ? String(confirmed) : ""); setEditing(true); }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>Actual {hasConfirmed && <span style={{ color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>✓</span>}</div>
           {hasConfirmed ? (
-            <>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>
-                ₱{confirmed.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>tap to edit</div>
-            </>
+            <><div style={{ fontSize: "16px", fontWeight: "700", color: matched ? "#16a34a" : over ? "#3b82f6" : "#ef4444" }}>₱{confirmed.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div><div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>tap to edit</div></>
           ) : (
-            <>
-              <div style={{ fontSize: "13px", fontWeight: "600", color: "#9ca3af" }}>— tap to enter</div>
-              <div style={{ fontSize: "10px", color: "#bbb", marginTop: "2px" }}>your cash count</div>
-            </>
+            <><div style={{ fontSize: "13px", fontWeight: "600", color: "#9ca3af" }}>— tap to enter</div><div style={{ fontSize: "10px", color: "#bbb", marginTop: "2px" }}>your cash count</div></>
           )}
         </div>
       </div>
-
-      {/* Difference badge */}
       {hasConfirmed && !matched && (
-        <div style={{
-          fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center",
-          backgroundColor: over ? "#eff6ff" : "#fff1f2",
-          color: over ? "#3b82f6" : "#ef4444",
-        }}>
-          {over
-            ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over system — check for unrecorded sales`
-            : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} under system — possible missing cash`}
+        <div style={{ fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center", backgroundColor: over ? "#eff6ff" : "#fff1f2", color: over ? "#3b82f6" : "#ef4444" }}>
+          {over ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over system — check for unrecorded sales` : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} under system — possible missing cash`}
         </div>
       )}
       {hasConfirmed && matched && (
-        <div style={{ fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center", backgroundColor: "#f0fdf4", color: "#16a34a" }}>
-          ✓ Cash matches system — all good!
-        </div>
+        <div style={{ fontSize: "12px", fontWeight: "600", padding: "5px 12px", borderRadius: "8px", textAlign: "center", backgroundColor: "#f0fdf4", color: "#16a34a" }}>✓ Cash matches system — all good!</div>
       )}
-
-      {/* Inline input */}
       {editing && (
         <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "14px", color: "#9ca3af", fontWeight: "600" }}>₱</span>
-          <input
-            ref={inputRef}
-            type="number"
-            step="0.01"
-            value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
-            onBlur={commit}
-            onKeyDown={e => e.key === "Enter" && commit()}
-            placeholder="Enter your actual cash total"
-            style={{ flex: 1, border: "1.5px solid #f97316", borderRadius: "10px", padding: "9px 12px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: "#1a1a2e" }}
-          />
-          <button onClick={commit} style={{ padding: "9px 16px", backgroundColor: "#f97316", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-            Save
-          </button>
+          <input ref={inputRef} type="number" step="0.01" value={inputVal} onChange={e => setInputVal(e.target.value)} onBlur={commit} onKeyDown={e => e.key === "Enter" && commit()} placeholder="Enter your actual cash total" style={{ flex: 1, border: "1.5px solid #f97316", borderRadius: "10px", padding: "9px 12px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: "#1a1a2e" }} />
+          <button onClick={commit} style={{ padding: "9px 16px", backgroundColor: "#f97316", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Save</button>
         </div>
       )}
     </div>
@@ -184,7 +127,8 @@ function RecordRow({ r, confirmed, onConfirm, onReview }) {
 }
 
 export default function Sales() {
-  const [activeTab, setActiveTab] = useState("Daily");
+  const [activeTab, setActiveTab] = useState("Monthly");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -196,13 +140,10 @@ export default function Sales() {
   useEffect(() => { fetchSales(); fetchProducts(); }, []);
 
   const fetchSales = async () => {
-    try { const res = await axios.get(`${BASE_URL}/sales`); setSales(res.data); }
-    catch (err) { console.error(err); }
+    try { const res = await axios.get(`${BASE_URL}/sales`); setSales(res.data); } catch (err) { console.error(err); }
   };
-
   const fetchProducts = async () => {
-    try { const res = await axios.get(`${BASE_URL}/products`); setProducts(res.data); }
-    catch (err) { console.error(err); }
+    try { const res = await axios.get(`${BASE_URL}/products`); setProducts(res.data); } catch (err) { console.error(err); }
   };
 
   const handleConfirm = (date, val) => {
@@ -216,67 +157,65 @@ export default function Sales() {
     if (!form.amount || parseFloat(form.amount) <= 0) return;
     setSubmitting(true);
     try {
-      await axios.post(`${BASE_URL}/sales`, {
-        productId: null,
-        productName: form.notes || "Daily sales summary",
-        qty: 1,
-        unitPrice: parseFloat(form.amount),
-        saleDate: form.date,
-        notes: form.notes,
-        isDailySummary: true,
-      });
+      await axios.post(`${BASE_URL}/sales`, { productId: null, productName: form.notes || "Daily sales summary", qty: 1, unitPrice: parseFloat(form.amount), saleDate: form.date, notes: form.notes, isDailySummary: true });
       setShowModal(false);
       setForm({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
       fetchSales();
-    } catch (err) { console.error(err); }
-    finally { setSubmitting(false); }
+    } catch (err) { console.error(err); } finally { setSubmitting(false); }
   };
 
+  // ── Filter sales by selected month ──────────────────────────────────────
+  const monthSales = filterByMonth(sales, "saleDate", selectedMonth);
+
   const now = new Date();
+  const filterByTab = (tab, items) => {
+    return items.filter((s) => {
+      const d = new Date(s.saleDate);
+      if (tab === "Daily") return d.toDateString() === now.toDateString();
+      if (tab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
+      return true; // Monthly — already filtered by selectedMonth
+    });
+  };
 
-  const filterSales = (tab) => sales.filter((s) => {
-    const d = new Date(s.saleDate);
-    if (tab === "Daily") return d.toDateString() === now.toDateString();
-    if (tab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-
-  const filtered = filterSales(activeTab);
+  const filtered = filterByTab(activeTab, monthSales);
   const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
 
-  const prevFilter = (() => {
-    if (activeTab === "Daily") { const y = new Date(now); y.setDate(now.getDate() - 1); return sales.filter(s => new Date(s.saleDate).toDateString() === y.toDateString()); }
-    if (activeTab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); const tw = new Date(now); tw.setDate(now.getDate() - 14); return sales.filter(s => { const d = new Date(s.saleDate); return d >= tw && d < w; }); }
-    const lm = new Date(now); lm.setMonth(now.getMonth() - 1);
-    return sales.filter(s => { const d = new Date(s.saleDate); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear(); });
+  // Previous month comparison (always compare monthly totals)
+  const [prevYear, prevMonth] = (() => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    return m === 1 ? [y - 1, 12] : [y, m - 1];
   })();
-  const prevTotal = prevFilter.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const prevMonthSales = sales.filter(s => { const d = new Date(s.saleDate); return d.getMonth() + 1 === prevMonth && d.getFullYear() === prevYear; });
+  const prevTotal = prevMonthSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const changePct = prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(0) : null;
 
+  // Chart — days in selected month
   const chartData = (() => {
-    const days = activeTab === "Daily" ? 1 : activeTab === "Weekly" ? 7 : 30;
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
     const map = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now); d.setDate(now.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      map[key] = { date: formatChartDate(key), total: 0 };
+    for (let i = 1; i <= daysInMonth; i++) {
+      const key = `${selectedMonth}-${String(i).padStart(2, "0")}`;
+      map[key] = { date: `${m}/${i}`, total: 0 };
     }
-    sales.forEach((s) => { const key = new Date(s.saleDate).toISOString().split("T")[0]; if (map[key]) map[key].total += parseFloat(s.total || s.unitPrice || 0); });
+    monthSales.forEach((s) => {
+      const key = new Date(s.saleDate).toISOString().split("T")[0];
+      if (map[key]) map[key].total += parseFloat(s.total || s.unitPrice || 0);
+    });
     return Object.values(map);
   })();
 
   const slowMoving = [...products].sort((a, b) => b.stock - a.stock).slice(0, 3);
 
-  // Group sales by date with systemTotal from checkout transactions
   const recentByDate = Object.values(
-    sales.reduce((acc, s) => {
+    monthSales.reduce((acc, s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
       if (!acc[key]) acc[key] = { date: key, systemTotal: 0, count: 0 };
       acc[key].systemTotal += parseFloat(s.total || s.unitPrice || 0);
       acc[key].count += 1;
       return acc;
     }, {})
-  ).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 7);
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const reviewSales = reviewDate
     ? sales.filter(s => new Date(s.saleDate).toISOString().split("T")[0] === reviewDate).sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
@@ -287,12 +226,19 @@ export default function Sales() {
   const confirmedCount = recentByDate.filter(r => confirmed[r.date] != null).length;
   const matchedCount = recentByDate.filter(r => confirmed[r.date] != null && confirmed[r.date] === r.systemTotal).length;
 
+  const monthOptions = getMonthOptions();
+  const selectedMonthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
+
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
       <div style={S.page}>
-        <div style={S.header}><h1 style={S.title}>Sales Overview</h1></div>
+        <div style={S.header}>
+          <div style={S.headerRow}>
+            <h1 style={S.title}>Sales Overview</h1>
+            <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          </div>
+        </div>
 
         <div style={S.body}>
           <div style={S.tabBar}>
@@ -300,23 +246,23 @@ export default function Sales() {
           </div>
 
           <div style={S.totalCard}>
-            <div style={S.totalLabel}>Total Sales ({activeTab.toLowerCase()})</div>
+            <div style={S.totalLabel}>Total Sales · {selectedMonthLabel}</div>
             <div style={S.totalAmount}>₱{total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
             <div style={S.totalChange}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
-              {changePct !== null ? `${changePct > 0 ? "+" : ""}${changePct}% vs last period` : "No previous data"}
+              {changePct !== null ? `${changePct > 0 ? "+" : ""}${changePct}% vs previous month` : "No previous month data"}
             </div>
           </div>
 
           <div style={S.card}>
-            <div style={S.cardTitle}>Sales Trend</div>
+            <div style={S.cardTitle}>Sales Trend — {selectedMonthLabel}</div>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={4} />
                 <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="total" stroke="#f97316" strokeWidth={2.5} dot={{ fill: "#f97316", r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="total" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -329,7 +275,7 @@ export default function Sales() {
             <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 10px" }}>Consider running a promotion for these items.</p>
             {slowMoving.length === 0 ? <div style={S.emptyText}>No products found.</div> : (
               slowMoving.map((p) => (
-                <div key={p._id} style={S.slowItem}>
+                <div key={p.id} style={S.slowItem}>
                   <span style={S.slowName}>{p.name}</span>
                   <span style={S.slowStock}>{p.stock} in stock</span>
                 </div>
@@ -337,7 +283,6 @@ export default function Sales() {
             )}
           </div>
 
-          {/* ── Recent Records with System vs Actual ── */}
           <div style={S.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
               <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Recent Records</div>
@@ -348,20 +293,13 @@ export default function Sales() {
               )}
             </div>
             <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>
-              At end of day, tap <strong style={{ color: "#374151" }}>Actual</strong> box to enter your real cash count and compare vs system
+              At end of day, tap <strong style={{ color: "#374151" }}>Actual</strong> box to compare vs system
             </div>
-
             {recentByDate.length === 0 ? (
-              <div style={S.emptyText}>No sales recorded yet.</div>
+              <div style={S.emptyText}>No sales recorded for {selectedMonthLabel}.</div>
             ) : (
               recentByDate.map((r) => (
-                <RecordRow
-                  key={r.date}
-                  r={r}
-                  confirmed={confirmed[r.date] ?? null}
-                  onConfirm={handleConfirm}
-                  onReview={() => setReviewDate(r.date)}
-                />
+                <RecordRow key={r.date} r={r} confirmed={confirmed[r.date] ?? null} onConfirm={handleConfirm} onReview={() => setReviewDate(r.date)} />
               ))
             )}
           </div>
@@ -369,7 +307,6 @@ export default function Sales() {
 
         <button style={S.fab} onClick={() => setShowModal(true)}>+</button>
 
-        {/* ── Record Sales Modal ── */}
         {showModal && (
           <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
             <div style={S.modal}>
@@ -388,15 +325,12 @@ export default function Sales() {
                 </form>
               </div>
               <div style={S.submitBtnWrap}>
-                <button type="submit" form="sales-form" style={S.submitBtn} disabled={submitting}>
-                  {submitting ? "Saving..." : "💾 Save Record"}
-                </button>
+                <button type="submit" form="sales-form" style={S.submitBtn} disabled={submitting}>{submitting ? "Saving..." : "💾 Save Record"}</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Review Modal ── */}
         {reviewDate && (
           <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setReviewDate(null)}>
             <div style={S.modal}>
@@ -406,8 +340,6 @@ export default function Sales() {
                   <button style={S.closeBtn} onClick={() => setReviewDate(null)}>✕</button>
                 </div>
                 <div style={S.modalSub}>{formatDate(reviewDate)}</div>
-
-                {/* System vs Actual comparison inside review */}
                 {confirmed[reviewDate] != null && (() => {
                   const c = confirmed[reviewDate];
                   const diff = c - reviewTotal;
@@ -415,27 +347,15 @@ export default function Sales() {
                   return (
                     <div style={{ backgroundColor: matched2 ? "#f0fdf4" : diff > 0 ? "#eff6ff" : "#fff1f2", border: `1.5px solid ${matched2 ? "#86efac" : diff > 0 ? "#bfdbfe" : "#fecaca"}`, borderRadius: "14px", padding: "16px", marginBottom: "16px" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                        <div>
-                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>System</div>
-                          <div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>Actual Cash</div>
-                          <div style={{ fontSize: "20px", fontWeight: "700", color: matched2 ? "#16a34a" : diff > 0 ? "#3b82f6" : "#ef4444" }}>₱{c.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                        </div>
+                        <div><div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", marginBottom: "3px" }}>System</div><div style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e" }}>₱{reviewTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div></div>
+                        <div style={{ textAlign: "right" }}><div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", marginBottom: "3px" }}>Actual Cash</div><div style={{ fontSize: "20px", fontWeight: "700", color: matched2 ? "#16a34a" : diff > 0 ? "#3b82f6" : "#ef4444" }}>₱{c.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div></div>
                       </div>
                       <div style={{ fontSize: "13px", fontWeight: "700", textAlign: "center", color: matched2 ? "#16a34a" : diff > 0 ? "#3b82f6" : "#ef4444" }}>
-                        {matched2
-                          ? "✓ Cash matches system — all good!"
-                          : diff > 0
-                            ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over — check for unrecorded sales`
-                            : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} short — possible missing cash`
-                        }
+                        {matched2 ? "✓ Cash matches system — all good!" : diff > 0 ? `+₱${diff.toLocaleString("en-PH", { minimumFractionDigits: 2 })} over — check for unrecorded sales` : `-₱${Math.abs(diff).toLocaleString("en-PH", { minimumFractionDigits: 2 })} short — possible missing cash`}
                       </div>
                     </div>
                   );
                 })()}
-
                 <div style={S.reviewSummaryBox}>
                   <div>
                     <div style={S.reviewSummaryLabel}>SYSTEM TOTAL</div>
@@ -444,7 +364,6 @@ export default function Sales() {
                   </div>
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fed7aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
                 </div>
-
                 {reviewSales.length === 0 ? <div style={S.emptyText}>No transactions found.</div> : (
                   reviewSales.map((s) => {
                     const type = getTxnType(s);
@@ -452,21 +371,18 @@ export default function Sales() {
                     const unitPrice = parseFloat(s.unitPrice) || 0;
                     const txnTotal = parseFloat(s.total || unitPrice * qty);
                     return (
-                      <div key={s._id} style={S.txnItem}>
+                      <div key={s.id} style={S.txnItem}>
                         <div style={S.txnLeft}>
                           <div style={S.txnName}>{s.productName || "Manual Entry"}</div>
                           <div style={S.txnMeta}>{formatTime(s.saleDate)}{qty > 1 && ` · qty ${qty}`}{unitPrice > 0 && ` · ₱${unitPrice.toFixed(2)}/ea`}</div>
                           <div style={S.typeBadge(type)}>{type === "checkout" ? "✓ Checkout" : "Manual"}</div>
                         </div>
-                        <div style={S.txnRight}>
-                          <div style={S.txnTotal}>₱{txnTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                        </div>
+                        <div style={S.txnRight}><div style={S.txnTotal}>₱{txnTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div></div>
                       </div>
                     );
                   })
                 )}
               </div>
-
               <div style={S.submitBtnWrap}>
                 <button style={{ ...S.submitBtn, backgroundColor: "#1a1a2e" }} onClick={() => setReviewDate(null)}>Close</button>
               </div>

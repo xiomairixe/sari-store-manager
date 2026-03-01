@@ -98,6 +98,15 @@ import Sale from "./models/sale.js";
 import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
 
+// ── HEALTH CHECK (required for keep-alive ping) ──────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── PRODUCTS ──
 app.get("/products", async (req, res) => {
   try {
@@ -293,4 +302,28 @@ app.delete("/utang/customers/:id", async (req, res) => {
 });
 
 // ── START SERVER ──
-app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+
+  // ── Keep-alive ping (prevents Render free tier from sleeping) ────────────
+  // Pings /health every 14 minutes so the server never goes idle.
+  // Set RENDER_EXTERNAL_URL in your Render environment variables:
+  //   e.g. https://your-app-name.onrender.com
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+
+  if (SELF_URL) {
+    setInterval(async () => {
+      try {
+        const res = await fetch(`${SELF_URL}/health`);
+        const data = await res.json();
+        console.log(`🏓 Keep-alive ping OK — uptime: ${data.uptime}s`);
+      } catch (err) {
+        console.warn("⚠️ Keep-alive ping failed:", err.message);
+      }
+    }, 14 * 60 * 1000); // every 14 minutes
+
+    console.log(`🏓 Keep-alive enabled → ${SELF_URL}/health`);
+  } else {
+    console.log("ℹ️  Keep-alive disabled (RENDER_EXTERNAL_URL not set)");
+  }
+});
