@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import MonthFilter, { getCurrentMonthValue, filterByMonth } from "./MonthFilter";
+import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./MonthFilter";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -34,8 +34,6 @@ const S = {
   emptyText: { fontSize: "13px", color: "#9ca3af", textAlign: "center", padding: "16px 0" },
   alertClose: { background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: 0 },
   alertLink: (color) => ({ fontSize: "12px", fontWeight: "700", color, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }),
-
-  // Month summary banner
   monthBanner: { background: "linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)", borderRadius: "16px", padding: "16px 18px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" },
   monthBannerLabel: { fontSize: "12px", opacity: 0.6, marginBottom: "4px" },
   monthBannerValue: { fontSize: "22px", fontWeight: "700" },
@@ -44,6 +42,7 @@ const S = {
 };
 
 const today = new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
+const fmtShort = (dateStr) => new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
 const QUICK_ACTIONS = [
   { label: "Add Stock", icon: "📦", color: "#f97316", bg: "#fff7ed", route: "/products" },
@@ -60,7 +59,7 @@ export default function Dashboard() {
   const [utangCustomers, setUtangCustomers] = useState([]);
   const [dismissedAlerts, setDismissedAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -82,18 +81,18 @@ export default function Dashboard() {
 
   const dismiss = (key) => setDismissedAlerts(p => [...p, key]);
 
-  // ── Filter by selected month ─────────────────────────────────────────────
-  const monthSales = filterByMonth(sales, "saleDate", selectedMonth);
-  const monthCosts = filterByMonth(costs, "costDate", selectedMonth);
+  // ── Filter by selected date range ────────────────────────────────────────
+  const rangeSales = filterByDateRange(sales, "saleDate", dateRange);
+  const rangeCosts = filterByDateRange(costs, "costDate", dateRange);
 
   const now = new Date();
   const todaySales = sales
     .filter(s => new Date(s.saleDate).toDateString() === now.toDateString())
     .reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
 
-  const monthRevenue = monthSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
-  const monthExpenses = monthCosts.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
-  const netProfit = monthRevenue - monthExpenses;
+  const rangeRevenue = rangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const rangeExpenses = rangeCosts.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+  const netProfit = rangeRevenue - rangeExpenses;
   const totalUtang = utangCustomers.reduce((sum, c) => sum + parseFloat(c.balance || 0), 0);
 
   const lowStock = products.filter(p => parseInt(p.stock) > 0 && parseInt(p.stock) <= (p.reorder || 10));
@@ -105,17 +104,22 @@ export default function Dashboard() {
     return diff >= 0 && diff <= 7;
   });
 
-  // Previous month for comparison
-  const [y, m] = selectedMonth.split("-").map(Number);
-  const prevM = m === 1 ? 12 : m - 1;
-  const prevY = m === 1 ? y - 1 : y;
-  const prevMonthKey = `${prevY}-${String(prevM).padStart(2, "0")}`;
-  const prevMonthSales = filterByMonth(sales, "saleDate", prevMonthKey);
-  const prevRevenue = prevMonthSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
-  const revenueChange = prevRevenue > 0 ? (((monthRevenue - prevRevenue) / prevRevenue) * 100).toFixed(0) : null;
+  // Previous period comparison (same number of days before the range)
+  const rangeDays = Math.round((new Date(dateRange.to) - new Date(dateRange.from)) / (1000 * 60 * 60 * 24)) + 1;
+  const prevEnd = new Date(dateRange.from);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - (rangeDays - 1));
+  const prevRangeSales = filterByDateRange(sales, "saleDate", {
+    from: prevStart.toISOString().split("T")[0],
+    to: prevEnd.toISOString().split("T")[0],
+  });
+  const prevRevenue = prevRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const revenueChange = prevRevenue > 0 ? (((rangeRevenue - prevRevenue) / prevRevenue) * 100).toFixed(0) : null;
 
-  const [selY, selM] = selectedMonth.split("-").map(Number);
-  const selectedMonthLabel = new Date(selY, selM - 1, 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+  const rangeLabel = dateRange.from === dateRange.to
+    ? fmtShort(dateRange.from)
+    : `${fmtShort(dateRange.from)} – ${fmtShort(dateRange.to)}`;
 
   const alerts = [
     outOfStock.length > 0 && { key: "outofstock", type: "danger", text: `${outOfStock.length} item${outOfStock.length > 1 ? "s are" : " is"} out of stock.`, link: "Restock", route: "/products" },
@@ -128,7 +132,7 @@ export default function Dashboard() {
 
   const METRICS = [
     { label: "Today's Sales", value: fmt(todaySales), color: "#16a34a", iconBg: "#f0fdf4", icon: "🛍️", sub: "today only", badge: null },
-    { label: "Net Profit", value: fmt(netProfit), color: netProfit >= 0 ? "#f97316" : "#ef4444", iconBg: "#fff7ed", icon: "📈", sub: selectedMonthLabel, badge: revenueChange !== null ? { text: `${revenueChange > 0 ? "+" : ""}${revenueChange}% vs prev`, color: revenueChange >= 0 ? "#16a34a" : "#ef4444" } : null },
+    { label: "Net Profit", value: fmt(netProfit), color: netProfit >= 0 ? "#f97316" : "#ef4444", iconBg: "#fff7ed", icon: "📈", sub: rangeLabel, badge: revenueChange !== null ? { text: `${revenueChange > 0 ? "+" : ""}${revenueChange}% vs prev`, color: revenueChange >= 0 ? "#16a34a" : "#ef4444" } : null },
     { label: "Total Items", value: products.length, color: "#3b82f6", iconBg: "#eff6ff", icon: "📦", sub: `${outOfStock.length} out of stock`, badge: outOfStock.length > 0 ? { text: `${outOfStock.length} OOS`, color: "#ef4444" } : lowStock.length > 0 ? { text: `${lowStock.length} low`, color: "#d97706" } : null },
     { label: "Total Utang", value: fmt(totalUtang), color: "#ef4444", iconBg: "#fef2f2", icon: "👥", sub: `${utangCustomers.filter(c => parseFloat(c.balance) > 0).length} with debt`, badge: null },
   ];
@@ -152,22 +156,21 @@ export default function Dashboard() {
             </div>
             <button style={S.reportsBtn} onClick={() => navigate("/sales")}>Reports</button>
           </div>
-          {/* Month filter full width below greeting */}
-          <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+          <DateRangeFilter range={dateRange} onChange={setDateRange} />
         </div>
 
         <div style={S.body}>
-          {/* Month Revenue Banner */}
+          {/* Range Revenue Banner */}
           {!loading && (
             <div style={S.monthBanner}>
               <div>
-                <div style={S.monthBannerLabel}>Monthly Revenue</div>
-                <div style={S.monthBannerValue}>{fmt(monthRevenue)}</div>
-                <div style={S.monthBannerSub}>{selectedMonthLabel}</div>
+                <div style={S.monthBannerLabel}>Revenue</div>
+                <div style={S.monthBannerValue}>{fmt(rangeRevenue)}</div>
+                <div style={S.monthBannerSub}>{rangeLabel}</div>
               </div>
               <div style={S.monthStatItem}>
                 <div style={S.monthBannerLabel}>Expenses</div>
-                <div style={{ fontSize: "17px", fontWeight: "700", color: "#fca5a5" }}>{fmt(monthExpenses)}</div>
+                <div style={{ fontSize: "17px", fontWeight: "700", color: "#fca5a5" }}>{fmt(rangeExpenses)}</div>
                 <div style={{ ...S.monthBannerLabel, marginTop: "8px" }}>Net Profit</div>
                 <div style={{ fontSize: "17px", fontWeight: "700", color: netProfit >= 0 ? "#86efac" : "#fca5a5" }}>{fmt(netProfit)}</div>
               </div>
@@ -218,7 +221,7 @@ export default function Dashboard() {
               recentSales.map((sale, i) => {
                 const isLast = i === recentSales.length - 1;
                 return (
-                  <div key={sale.id} style={{ ...S.activityItem, borderBottom: isLast ? "none" : "1px solid #f3f4f6" }}>
+                  <div key={sale._id || sale.id} style={{ ...S.activityItem, borderBottom: isLast ? "none" : "1px solid #f3f4f6" }}>
                     <div style={S.activityDot("#f97316")} />
                     <div style={{ flex: 1 }}>
                       <p style={S.activityName}>{sale.productName}</p>

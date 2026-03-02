@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import MonthFilter, { getMonthOptions, getCurrentMonthValue, filterByMonth } from "./MonthFilter";
+import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./MonthFilter";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -53,10 +53,9 @@ const S = {
   typeBadge: (type) => ({ display: "inline-block", padding: "2px 8px", borderRadius: "99px", fontSize: "10px", fontWeight: "700", backgroundColor: type === "checkout" ? "#f0fdf4" : "#fff8f0", color: type === "checkout" ? "#16a34a" : "#f97316", marginTop: "3px" }),
 };
 
-const TABS = ["Daily", "Weekly", "Monthly"];
+const TABS = ["Daily", "Weekly", "Range"];
 const formatDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 const formatTime = (d) => new Date(d).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true });
-const formatChartDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -127,8 +126,8 @@ function RecordRow({ r, confirmed, onConfirm, onReview }) {
 }
 
 export default function Sales() {
-  const [activeTab, setActiveTab] = useState("Monthly");
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
+  const [activeTab, setActiveTab] = useState("Range");
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -164,41 +163,54 @@ export default function Sales() {
     } catch (err) { console.error(err); } finally { setSubmitting(false); }
   };
 
-  // ── Filter sales by selected month ──────────────────────────────────────
-  const monthSales = filterByMonth(sales, "saleDate", selectedMonth);
-
   const now = new Date();
-  const filterByTab = (tab, items) => {
-    return items.filter((s) => {
-      const d = new Date(s.saleDate);
-      if (tab === "Daily") return d.toDateString() === now.toDateString();
-      if (tab === "Weekly") { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
-      return true; // Monthly — already filtered by selectedMonth
-    });
+  const todayStr = now.toISOString().split("T")[0];
+
+  // ── Apply tab + date range filter ────────────────────────────────────────
+  const getFilteredSales = () => {
+    if (activeTab === "Daily") {
+      return sales.filter(s => new Date(s.saleDate).toDateString() === now.toDateString());
+    }
+    if (activeTab === "Weekly") {
+      const w = new Date(now); w.setDate(now.getDate() - 6);
+      return sales.filter(s => new Date(s.saleDate) >= w);
+    }
+    // Range tab
+    return filterByDateRange(sales, "saleDate", dateRange);
   };
 
-  const filtered = filterByTab(activeTab, monthSales);
+  const filtered = getFilteredSales();
   const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
 
-  // Previous month comparison (always compare monthly totals)
-  const [prevYear, prevMonth] = (() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    return m === 1 ? [y - 1, 12] : [y, m - 1];
+  // Previous period comparison for range tab
+  const rangeDays = (() => {
+    const diff = new Date(dateRange.to) - new Date(dateRange.from);
+    return Math.round(diff / (1000 * 60 * 60 * 24)) + 1;
   })();
-  const prevMonthSales = sales.filter(s => { const d = new Date(s.saleDate); return d.getMonth() + 1 === prevMonth && d.getFullYear() === prevYear; });
-  const prevTotal = prevMonthSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const prevRangeEnd = new Date(dateRange.from);
+  prevRangeEnd.setDate(prevRangeEnd.getDate() - 1);
+  const prevRangeStart = new Date(prevRangeEnd);
+  prevRangeStart.setDate(prevRangeStart.getDate() - (rangeDays - 1));
+  const prevRangeSales = filterByDateRange(sales, "saleDate", {
+    from: prevRangeStart.toISOString().split("T")[0],
+    to: prevRangeEnd.toISOString().split("T")[0],
+  });
+  const prevTotal = prevRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const changePct = prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(0) : null;
 
-  // Chart — days in selected month
+  // Chart — day-by-day for selected range
   const chartData = (() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
     const map = {};
-    for (let i = 1; i <= daysInMonth; i++) {
-      const key = `${selectedMonth}-${String(i).padStart(2, "0")}`;
-      map[key] = { date: `${m}/${i}`, total: 0 };
+    const start = new Date(activeTab === "Daily" ? todayStr : activeTab === "Weekly" ? (() => { const d = new Date(now); d.setDate(now.getDate() - 6); return d.toISOString().split("T")[0]; })() : dateRange.from);
+    const end = new Date(activeTab === "Daily" || activeTab === "Weekly" ? todayStr : dateRange.to);
+    const cur = new Date(start);
+    while (cur <= end) {
+      const key = cur.toISOString().split("T")[0];
+      const [, mm, dd] = key.split("-");
+      map[key] = { date: `${parseInt(mm)}/${parseInt(dd)}`, total: 0 };
+      cur.setDate(cur.getDate() + 1);
     }
-    monthSales.forEach((s) => {
+    filtered.forEach((s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
       if (map[key]) map[key].total += parseFloat(s.total || s.unitPrice || 0);
     });
@@ -208,7 +220,7 @@ export default function Sales() {
   const slowMoving = [...products].sort((a, b) => b.stock - a.stock).slice(0, 3);
 
   const recentByDate = Object.values(
-    monthSales.reduce((acc, s) => {
+    filtered.reduce((acc, s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
       if (!acc[key]) acc[key] = { date: key, systemTotal: 0, count: 0 };
       acc[key].systemTotal += parseFloat(s.total || s.unitPrice || 0);
@@ -226,8 +238,7 @@ export default function Sales() {
   const confirmedCount = recentByDate.filter(r => confirmed[r.date] != null).length;
   const matchedCount = recentByDate.filter(r => confirmed[r.date] != null && confirmed[r.date] === r.systemTotal).length;
 
-  const monthOptions = getMonthOptions();
-  const selectedMonthLabel = monthOptions.find(o => o.value === selectedMonth)?.label || "";
+  const rangeLabel = activeTab === "Daily" ? "Today" : activeTab === "Weekly" ? "Last 7 Days" : `${dateRange.from === dateRange.to ? formatDate(dateRange.from) : `${formatDate(dateRange.from)} – ${formatDate(dateRange.to)}`}`;
 
   return (
     <>
@@ -236,7 +247,7 @@ export default function Sales() {
         <div style={S.header}>
           <div style={S.headerRow}>
             <h1 style={S.title}>Sales Overview</h1>
-            <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+            <DateRangeFilter range={dateRange} onChange={(r) => { setDateRange(r); setActiveTab("Range"); }} />
           </div>
         </div>
 
@@ -246,20 +257,20 @@ export default function Sales() {
           </div>
 
           <div style={S.totalCard}>
-            <div style={S.totalLabel}>Total Sales · {selectedMonthLabel}</div>
+            <div style={S.totalLabel}>Total Sales · {rangeLabel}</div>
             <div style={S.totalAmount}>₱{total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
             <div style={S.totalChange}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
-              {changePct !== null ? `${changePct > 0 ? "+" : ""}${changePct}% vs previous month` : "No previous month data"}
+              {changePct !== null ? `${changePct > 0 ? "+" : ""}${changePct}% vs previous period` : "No previous period data"}
             </div>
           </div>
 
           <div style={S.card}>
-            <div style={S.cardTitle}>Sales Trend — {selectedMonthLabel}</div>
+            <div style={S.cardTitle}>Sales Trend</div>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={4} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={Math.max(0, Math.floor(chartData.length / 6) - 1)} />
                 <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Line type="monotone" dataKey="total" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
@@ -285,7 +296,7 @@ export default function Sales() {
 
           <div style={S.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-              <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Recent Records</div>
+              <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>Records · {rangeLabel}</div>
               {confirmedCount > 0 && (
                 <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "99px", backgroundColor: matchedCount === confirmedCount ? "#f0fdf4" : "#fff8f0", color: matchedCount === confirmedCount ? "#16a34a" : "#f97316" }}>
                   {matchedCount}/{confirmedCount} matched
@@ -296,7 +307,7 @@ export default function Sales() {
               At end of day, tap <strong style={{ color: "#374151" }}>Actual</strong> box to compare vs system
             </div>
             {recentByDate.length === 0 ? (
-              <div style={S.emptyText}>No sales recorded for {selectedMonthLabel}.</div>
+              <div style={S.emptyText}>No sales recorded for this period.</div>
             ) : (
               recentByDate.map((r) => (
                 <RecordRow key={r.date} r={r} confirmed={confirmed[r.date] ?? null} onConfirm={handleConfirm} onReview={() => setReviewDate(r.date)} />
@@ -371,7 +382,7 @@ export default function Sales() {
                     const unitPrice = parseFloat(s.unitPrice) || 0;
                     const txnTotal = parseFloat(s.total || unitPrice * qty);
                     return (
-                      <div key={s.id} style={S.txnItem}>
+                      <div key={s._id || s.id} style={S.txnItem}>
                         <div style={S.txnLeft}>
                           <div style={S.txnName}>{s.productName || "Manual Entry"}</div>
                           <div style={S.txnMeta}>{formatTime(s.saleDate)}{qty > 1 && ` · qty ${qty}`}{unitPrice > 0 && ` · ₱${unitPrice.toFixed(2)}/ea`}</div>

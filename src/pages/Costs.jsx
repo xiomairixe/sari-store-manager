@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import MonthFilter, { getCurrentMonthValue, filterByMonth } from "./MonthFilter";
+import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./MonthFilter";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -51,6 +51,7 @@ const S = {
 };
 
 const formatDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+const fmtShort = (dateStr) => new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
@@ -74,7 +75,7 @@ export default function Costs() {
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
 
   useEffect(() => { fetchCosts(); fetchSales(); }, []);
 
@@ -103,24 +104,24 @@ export default function Costs() {
     catch (err) { console.error(err); } finally { setDeleteTarget(null); }
   };
 
-  // ── Filter by selected month ─────────────────────────────────────────────
-  const thisMonthSales = filterByMonth(sales, "saleDate", selectedMonth);
-  const thisMonthCosts = filterByMonth(costs, "costDate", selectedMonth);
+  // ── Filter by selected date range ────────────────────────────────────────
+  const thisRangeSales = filterByDateRange(sales, "saleDate", dateRange);
+  const thisRangeCosts = filterByDateRange(costs, "costDate", dateRange);
 
-  const revenue = thisMonthSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
-  const expenses = thisMonthCosts.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+  const revenue = thisRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const expenses = thisRangeCosts.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
   const netProfit = revenue - expenses;
 
   const pieData = CATEGORIES.map(cat => ({
     name: cat,
-    value: thisMonthCosts.filter(c => c.category === cat).reduce((sum, c) => sum + parseFloat(c.amount || 0), 0),
+    value: thisRangeCosts.filter(c => c.category === cat).reduce((sum, c) => sum + parseFloat(c.amount || 0), 0),
   })).filter(d => d.value > 0);
 
-  const recent = [...thisMonthCosts].sort((a, b) => new Date(b.costDate) - new Date(a.costDate));
+  const recent = [...thisRangeCosts].sort((a, b) => new Date(b.costDate) - new Date(a.costDate));
 
-  // ── Month label — pure JS, no require ───────────────────────────────────
-  const [selY, selM] = selectedMonth.split("-").map(Number);
-  const selectedMonthLabel = new Date(selY, selM - 1, 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+  const rangeLabel = dateRange.from === dateRange.to
+    ? fmtShort(dateRange.from)
+    : `${fmtShort(dateRange.from)} – ${fmtShort(dateRange.to)}`;
 
   return (
     <>
@@ -129,7 +130,7 @@ export default function Costs() {
         <div style={S.header}>
           <div style={S.headerRow}>
             <h1 style={S.title}>Expenses & Profit</h1>
-            <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+            <DateRangeFilter range={dateRange} onChange={setDateRange} />
           </div>
         </div>
 
@@ -137,7 +138,7 @@ export default function Costs() {
           {/* Financial Summary */}
           <div style={S.card}>
             <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "6px" }}>
-              Financial Summary · {selectedMonthLabel}
+              Financial Summary · {rangeLabel}
             </div>
             <div style={S.summaryRow}>
               <span style={S.summaryKey}>Revenue</span>
@@ -157,9 +158,9 @@ export default function Costs() {
 
           {/* Pie Chart */}
           <div style={S.card}>
-            <div style={S.cardTitle}>Expense Breakdown · {selectedMonthLabel}</div>
+            <div style={S.cardTitle}>Expense Breakdown · {rangeLabel}</div>
             {pieData.length === 0 ? (
-              <div style={S.emptyText}>No expenses for {selectedMonthLabel}.</div>
+              <div style={S.emptyText}>No expenses for this period.</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={220}>
@@ -183,10 +184,10 @@ export default function Costs() {
           </div>
 
           {/* Expenses List */}
-          <div style={S.sectionTitle}>Expenses · {selectedMonthLabel}</div>
+          <div style={S.sectionTitle}>Expenses · {rangeLabel}</div>
           <div style={{ ...S.card, padding: "4px 16px" }}>
             {recent.length === 0 ? (
-              <div style={S.emptyText}>No expenses for {selectedMonthLabel}. Tap + to add.</div>
+              <div style={S.emptyText}>No expenses for this period. Tap + to add.</div>
             ) : (
               recent.map((cost) => {
                 const color = CATEGORY_COLORS[cost.category] || "#9ca3af";
@@ -225,14 +226,8 @@ export default function Costs() {
               <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px" }}>Delete Expense?</div>
               <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "24px" }}>This action cannot be undone.</div>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", fontSize: "14px", fontWeight: "600", color: "#374151", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                >Cancel</button>
-                <button
-                  onClick={handleDelete}
-                  style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "none", backgroundColor: "#ef4444", fontSize: "14px", fontWeight: "700", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                >Delete</button>
+                <button onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "1.5px solid #e5e7eb", backgroundColor: "#fff", fontSize: "14px", fontWeight: "600", color: "#374151", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+                <button onClick={handleDelete} style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "none", backgroundColor: "#ef4444", fontSize: "14px", fontWeight: "700", color: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Delete</button>
               </div>
             </div>
           </div>
@@ -249,40 +244,21 @@ export default function Costs() {
                 </div>
                 <form id="expense-form" onSubmit={handleSubmit}>
                   <label style={S.label}>Description</label>
-                  <input
-                    style={S.input}
-                    placeholder="e.g. Meralco Bill"
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  />
+                  <input style={S.input} placeholder="e.g. Meralco Bill" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                   <div style={S.row2}>
                     <div>
                       <label style={S.label}>Amount</label>
-                      <input
-                        style={S.input}
-                        type="number" step="0.01" placeholder="0.00"
-                        value={form.amount}
-                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                      />
+                      <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                     </div>
                     <div>
                       <label style={S.label}>Category</label>
-                      <select
-                        style={S.input}
-                        value={form.category}
-                        onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      >
+                      <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
                   <label style={S.label}>Date</label>
-                  <input
-                    style={{ ...S.input, marginBottom: "4px" }}
-                    type="date"
-                    value={form.costDate}
-                    onChange={(e) => setForm({ ...form, costDate: e.target.value })}
-                  />
+                  <input style={{ ...S.input, marginBottom: "4px" }} type="date" value={form.costDate} onChange={(e) => setForm({ ...form, costDate: e.target.value })} />
                 </form>
               </div>
               <div style={S.submitBtnWrap}>
