@@ -97,6 +97,7 @@ import Product from "./models/product.js";
 import Sale from "./models/sale.js";
 import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
+import Asset from "./models/asset.js";
 
 // ── HEALTH CHECK (required for keep-alive ping) ──────────────────────────────
 app.get("/health", (req, res) => {
@@ -301,14 +302,42 @@ app.delete("/utang/customers/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── ASSETS ──
+app.get("/api/assets", async (req, res) => {
+  try {
+    const assets = await Asset.find().sort({ createdAt: -1 });
+    res.json(assets);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/assets", async (req, res) => {
+  try {
+    const asset = new Asset(req.body);
+    await asset.save();
+    res.status(201).json(asset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/api/assets/:id", async (req, res) => {
+  try {
+    const updated = await Asset.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: "Asset not found" });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/assets/:id", async (req, res) => {
+  try {
+    await Asset.findByIdAndDelete(req.params.id);
+    res.json({ message: "Asset deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── START SERVER ──
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 
   // ── Keep-alive ping (prevents Render free tier from sleeping) ────────────
-  // Pings /health every 14 minutes so the server never goes idle.
-  // Set RENDER_EXTERNAL_URL in your Render environment variables:
-  //   e.g. https://your-app-name.onrender.com
   const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 
   if (SELF_URL) {
@@ -320,7 +349,7 @@ app.listen(PORT, "0.0.0.0", () => {
       } catch (err) {
         console.warn("⚠️ Keep-alive ping failed:", err.message);
       }
-    }, 14 * 60 * 1000); // every 14 minutes
+    }, 14 * 60 * 1000);
 
     console.log(`🏓 Keep-alive enabled → ${SELF_URL}/health`);
   } else {
