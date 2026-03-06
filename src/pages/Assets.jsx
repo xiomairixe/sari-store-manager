@@ -33,7 +33,7 @@ const EMPTY_FORM = { name: "", category: "equipment", value: "", purchaseDate: "
 const fmt     = (v) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—";
 
-// ── Styles (mirroring Sales.jsx pattern) ────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
 const S = {
   page:        { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
   header:      { padding: "20px 20px 10px", backgroundColor: "#f5f6fa", position: "sticky", top: 0, zIndex: 10 },
@@ -41,7 +41,6 @@ const S = {
   title:       { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   body:        { padding: "0 16px", display: "flex", flexDirection: "column", gap: "14px" },
 
-  // Hero card
   totalCard:   { background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", borderRadius: "18px", padding: "20px", color: "#fff" },
   totalLabel:  { fontSize: "13px", fontWeight: "500", opacity: 0.85, marginBottom: "6px" },
   totalAmount: { fontSize: "34px", fontWeight: "700", margin: "0 0 12px", letterSpacing: "-0.5px" },
@@ -50,19 +49,15 @@ const S = {
   statNum:     { fontSize: "20px", fontWeight: "700" },
   statLbl:     { fontSize: "11px", opacity: 0.85, marginTop: "2px" },
 
-  // White cards
   card:        { backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
   cardTitle:   { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
 
-  // Search
   searchWrap:  { display: "flex", alignItems: "center", gap: "8px", backgroundColor: "#fff", borderRadius: "12px", padding: "10px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
   searchInput: { flex: 1, border: "none", outline: "none", fontSize: "14px", color: "#1a1a2e", fontFamily: "'DM Sans', sans-serif", backgroundColor: "transparent" },
 
-  // Category tabs
   tabs:  { display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "2px" },
   tab:   (a) => ({ padding: "7px 14px", borderRadius: "20px", border: a ? "none" : "1.5px solid #e5e7eb", backgroundColor: a ? "#f97316" : "#fff", color: a ? "#fff" : "#6b7280", fontSize: "12px", fontWeight: a ? "700" : "500", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", boxShadow: a ? "0 2px 8px rgba(249,115,22,0.3)" : "none" }),
 
-  // Asset row
   assetRow:   { display: "flex", alignItems: "center", padding: "13px 0", borderBottom: "1px solid #f3f4f6", gap: "12px", cursor: "pointer" },
   assetLeft:  { flex: 1, minWidth: 0 },
   assetName:  { fontSize: "14px", fontWeight: "600", color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
@@ -71,10 +66,8 @@ const S = {
   assetValue: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e" },
   badge: (bg, text) => ({ display: "inline-block", padding: "2px 8px", borderRadius: "99px", fontSize: "10px", fontWeight: "700", backgroundColor: bg, color: text, marginTop: "3px" }),
 
-  // FAB
   fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#f97316", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(249,115,22,0.4)", zIndex: 100 },
 
-  // Modal (bottom sheet — same as Sales)
   overlay:         { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
   modal:           { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" },
   modalScrollArea: { padding: "24px 20px 8px", overflowY: "auto", flex: 1, minHeight: 0 },
@@ -111,7 +104,7 @@ export default function Assets() {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/assets`);
+      const res = await axios.get(`${BASE_URL}/api/assets`);           // ✅ fixed
       setAssets(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       showToast("Failed to fetch assets", "error");
@@ -145,11 +138,11 @@ export default function Assets() {
     setSaving(true);
     try {
       if (editing) {
-        const res = await axios.put(`${BASE_URL}/assets/${editing._id}`, form);
+        const res = await axios.put(`${BASE_URL}/api/assets/${editing._id}`, form);   // ✅ fixed
         setAssets(prev => prev.map(a => a._id === editing._id ? res.data : a));
         showToast("Asset updated!");
       } else {
-        const res = await axios.post(`${BASE_URL}/assets`, form);
+        const res = await axios.post(`${BASE_URL}/api/assets`, form);                 // ✅ fixed
         setAssets(prev => [res.data, ...prev]);
         showToast("Asset added!");
       }
@@ -164,7 +157,7 @@ export default function Assets() {
   const handleDelete = async () => {
     if (!editing) return;
     try {
-      await axios.delete(`${BASE_URL}/assets/${editing._id}`);
+      await axios.delete(`${BASE_URL}/api/assets/${editing._id}`);                    // ✅ fixed
       setAssets(prev => prev.filter(a => a._id !== editing._id));
       showToast("Asset deleted.");
       closeModal();
