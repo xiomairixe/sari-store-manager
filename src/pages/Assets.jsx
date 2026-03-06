@@ -27,7 +27,10 @@ const STATUS_CFG = {
   disposed:    { label: "Disposed",    bg: "#fee2e2", text: "#b91c1c" },
 };
 
-const EMPTY_FORM = { name: "", category: "equipment", value: "", purchaseDate: "", status: "active", description: "" };
+const EMPTY_FORM = {
+  name: "", category: "equipment", value: "", purchaseDate: "",
+  status: "active", description: "", quantity: "",
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt     = (v) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
@@ -83,6 +86,16 @@ const S = {
   submitBtn:       { width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   deleteBtn:       { width: "100%", backgroundColor: "#fff", color: "#ef4444", border: "1.5px solid #fecaca", borderRadius: "12px", padding: "13px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: "10px" },
 
+  // Quantity adjuster
+  qtyBox:    { backgroundColor: "#f8fafc", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #e5e7eb" },
+  qtyTitle:  { fontSize: "13px", fontWeight: "700", color: "#374151", marginBottom: "10px" },
+  qtyDisplay:{ fontSize: "28px", fontWeight: "700", color: "#1a1a2e", textAlign: "center", margin: "4px 0 12px" },
+  qtyRow:    { display: "flex", gap: "10px", alignItems: "center" },
+  qtyBtn:    (color) => ({ flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: color, color: "#fff", fontSize: "20px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }),
+  qtyInput:  { flex: 2, border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" },
+  qtyHint:   { fontSize: "11px", color: "#9ca3af", textAlign: "center", marginTop: "8px" },
+  divider:   { border: "none", borderTop: "1px solid #f3f4f6", margin: "4px 0 16px" },
+
   emptyText: { textAlign: "center", color: "#9ca3af", padding: "30px 0", fontSize: "13px" },
   toast: (type) => ({ position: "fixed", bottom: "90px", left: "50%", transform: "translateX(-50%)", backgroundColor: type === "error" ? "#ef4444" : "#22c55e", color: "#fff", padding: "10px 22px", borderRadius: "24px", fontSize: "13px", fontWeight: "700", zIndex: 300, boxShadow: "0 4px 14px rgba(0,0,0,0.18)", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }),
 };
@@ -98,13 +111,14 @@ export default function Assets() {
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
   const [toast, setToast]         = useState(null);
+  const [qtyChange, setQtyChange] = useState("");
 
   useEffect(() => { fetchAssets(); }, []);
 
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/api/assets`);           // ✅ fixed
+      const res = await axios.get(`${BASE_URL}/api/assets`);
       setAssets(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       showToast("Failed to fetch assets", "error");
@@ -118,31 +132,50 @@ export default function Assets() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openAdd = () => {
+    setEditing(null); setForm(EMPTY_FORM); setQtyChange(""); setShowModal(true);
+  };
+
   const openEdit = (asset) => {
     setEditing(asset);
     setForm({
-      name:         asset.name        || "",
-      category:     asset.category    || "equipment",
-      value:        asset.value       || "",
+      name:         asset.name         || "",
+      category:     asset.category     || "equipment",
+      value:        asset.value        || "",
       purchaseDate: asset.purchaseDate ? asset.purchaseDate.slice(0, 10) : "",
-      status:       asset.status      || "active",
-      description:  asset.description || "",
+      status:       asset.status       || "active",
+      description:  asset.description  || "",
+      quantity:     asset.quantity != null ? asset.quantity : "",
     });
+    setQtyChange("");
     setShowModal(true);
   };
-  const closeModal = () => { setShowModal(false); setEditing(null); setForm(EMPTY_FORM); };
+
+  const closeModal = () => {
+    setShowModal(false); setEditing(null); setForm(EMPTY_FORM); setQtyChange("");
+  };
+
+  // +/- quantity buttons
+  const applyQty = (delta) => {
+    const change = Number(qtyChange);
+    if (!change || change <= 0) { showToast("Enter a valid quantity", "error"); return; }
+    const current = Number(form.quantity) || 0;
+    const next    = Math.max(0, current + delta * change);
+    setForm(f => ({ ...f, quantity: next }));
+    setQtyChange("");
+  };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.value) { showToast("Name and value are required.", "error"); return; }
     setSaving(true);
     try {
+      const payload = { ...form, quantity: form.quantity !== "" ? Number(form.quantity) : null };
       if (editing) {
-        const res = await axios.put(`${BASE_URL}/api/assets/${editing._id}`, form);   // ✅ fixed
+        const res = await axios.put(`${BASE_URL}/api/assets/${editing._id}`, payload);
         setAssets(prev => prev.map(a => a._id === editing._id ? res.data : a));
         showToast("Asset updated!");
       } else {
-        const res = await axios.post(`${BASE_URL}/api/assets`, form);                 // ✅ fixed
+        const res = await axios.post(`${BASE_URL}/api/assets`, payload);
         setAssets(prev => [res.data, ...prev]);
         showToast("Asset added!");
       }
@@ -157,7 +190,7 @@ export default function Assets() {
   const handleDelete = async () => {
     if (!editing) return;
     try {
-      await axios.delete(`${BASE_URL}/api/assets/${editing._id}`);                    // ✅ fixed
+      await axios.delete(`${BASE_URL}/api/assets/${editing._id}`);
       setAssets(prev => prev.filter(a => a._id !== editing._id));
       showToast("Asset deleted.");
       closeModal();
@@ -205,22 +238,10 @@ export default function Assets() {
             <div style={S.totalLabel}>Total Asset Value</div>
             <div style={S.totalAmount}>{fmt(totalValue)}</div>
             <div style={S.statsRow}>
-              <div style={S.statChip}>
-                <div style={S.statNum}>{activeCount}</div>
-                <div style={S.statLbl}>Active</div>
-              </div>
-              <div style={S.statChip}>
-                <div style={S.statNum}>{maintCount}</div>
-                <div style={S.statLbl}>Maintenance</div>
-              </div>
-              <div style={S.statChip}>
-                <div style={S.statNum}>{disposedCount}</div>
-                <div style={S.statLbl}>Disposed</div>
-              </div>
-              <div style={S.statChip}>
-                <div style={S.statNum}>{assets.length}</div>
-                <div style={S.statLbl}>Total</div>
-              </div>
+              <div style={S.statChip}><div style={S.statNum}>{activeCount}</div><div style={S.statLbl}>Active</div></div>
+              <div style={S.statChip}><div style={S.statNum}>{maintCount}</div><div style={S.statLbl}>Maintenance</div></div>
+              <div style={S.statChip}><div style={S.statNum}>{disposedCount}</div><div style={S.statLbl}>Disposed</div></div>
+              <div style={S.statChip}><div style={S.statNum}>{assets.length}</div><div style={S.statLbl}>Total</div></div>
             </div>
           </div>
 
@@ -230,9 +251,7 @@ export default function Assets() {
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             <input style={S.searchInput} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
-            {search && (
-              <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "18px", lineHeight: 1 }}>✕</button>
-            )}
+            {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "18px", lineHeight: 1 }}>✕</button>}
           </div>
 
           {/* ── Category tabs ── */}
@@ -274,7 +293,8 @@ export default function Assets() {
                           <div style={S.assetName}>{asset.name}</div>
                           <div style={S.assetMeta}>
                             {fmtDate(asset.purchaseDate)}
-                            {asset.description ? ` · ${asset.description.slice(0, 30)}${asset.description.length > 30 ? "…" : ""}` : ""}
+                            {asset.quantity != null ? ` · Qty: ${asset.quantity}` : ""}
+                            {asset.description ? ` · ${asset.description.slice(0, 25)}${asset.description.length > 25 ? "…" : ""}` : ""}
                           </div>
                           <span style={S.badge(statusCfg.bg, statusCfg.text)}>{statusCfg.label}</span>
                         </div>
@@ -296,35 +316,29 @@ export default function Assets() {
         {/* ── FAB ── */}
         <button style={S.fab} onClick={openAdd}>+</button>
 
-        {/* ── Add / Edit Modal ── */}
+        {/* ── Modal ── */}
         {showModal && (
           <div style={S.overlay} onClick={e => e.target === e.currentTarget && closeModal()}>
             <div style={S.modal}>
               <div style={S.modalScrollArea}>
+
                 <div style={S.modalHeader}>
                   <h2 style={S.modalTitle}>{editing ? "Edit Asset" : "Add Asset"}</h2>
                   <button style={S.closeBtn} onClick={closeModal}>✕</button>
                 </div>
                 <p style={S.modalSub}>{editing ? `Editing · ${editing.name}` : "Enter asset details below"}</p>
 
+                {/* Name */}
                 <label style={S.label}>Asset Name *</label>
                 <input style={S.input} placeholder="e.g. Delivery Truck" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
 
-                <div style={S.row2}>
-                  <div style={{ flex: 1 }}>
-                    <label style={S.label}>Category</label>
-                    <select style={S.input} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                      {CATEGORIES.filter(c => c.key !== "all").map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={S.label}>Status</label>
-                    <select style={S.input} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                      {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                    </select>
-                  </div>
-                </div>
+                {/* Status */}
+                <label style={S.label}>Status</label>
+                <select style={S.input} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                  {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
 
+                {/* Value + Purchase Date */}
                 <div style={S.row2}>
                   <div style={{ flex: 1 }}>
                     <label style={S.label}>Value (₱) *</label>
@@ -336,8 +350,44 @@ export default function Assets() {
                   </div>
                 </div>
 
+                {/* Description */}
                 <label style={S.label}>Description</label>
                 <textarea style={S.textarea} placeholder="Optional notes..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+
+                {/* ADD MODE — simple qty input */}
+                {!editing && (
+                  <>
+                    <label style={S.label}>Quantity <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span></label>
+                    <input style={S.input} type="number" min="0" placeholder="e.g. 5" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+                  </>
+                )}
+
+                {/* EDIT MODE — quantity adjuster */}
+                {editing && (
+                  <>
+                    <hr style={S.divider} />
+                    <div style={S.qtyBox}>
+                      <div style={S.qtyTitle}>📦 Adjust Quantity</div>
+                      <div style={S.qtyDisplay}>
+                        {form.quantity !== "" && form.quantity != null ? form.quantity : "—"}
+                      </div>
+                      <div style={S.qtyRow}>
+                        <button style={S.qtyBtn("#ef4444")} onClick={() => applyQty(-1)}>−</button>
+                        <input
+                          style={S.qtyInput}
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          value={qtyChange}
+                          onChange={e => setQtyChange(e.target.value)}
+                        />
+                        <button style={S.qtyBtn("#22c55e")} onClick={() => applyQty(+1)}>+</button>
+                      </div>
+                      <div style={S.qtyHint}>Enter amount · tap − to deduct or + to add</div>
+                    </div>
+                  </>
+                )}
+
               </div>
 
               <div style={S.submitBtnWrap}>

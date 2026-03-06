@@ -31,6 +31,11 @@ const assetSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    quantity: {
+      type: Number,
+      default: null,
+      min: [0, "Quantity cannot be negative"],
+    },
   },
   {
     timestamps: true,
