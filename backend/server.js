@@ -99,7 +99,7 @@ import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
 import Asset from "./models/asset.js";
 
-// ── HEALTH CHECK (required for keep-alive ping) ──────────────────────────────
+// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -129,13 +129,11 @@ app.post("/products", upload.single("image"), async (req, res) => {
     const data = parseProductFields(req.body);
     if (req.file) data.image = req.file.path;
 
-    // ── Stock is always saved in PIECES ──
     const isBulk = BULK_UNITS.includes(data.unit);
     if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
       data.stock = (data.stock || 0) * data.pcsPerUnit;
     }
 
-    // ── Selling price always rounded UP to next whole peso ──
     data.sellingPrice = computeSellingPrice(
       data.cost || 0,
       data.markup || 0,
@@ -159,14 +157,12 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
       data.image = req.file.path;
     }
 
-    // ── If stock was re-entered in packs, convert to pcs ──
     const isBulk = BULK_UNITS.includes(data.unit);
     if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0 && data.stockInPacks === "true") {
       data.stock = (data.stock || 0) * data.pcsPerUnit;
     }
     delete data.stockInPacks;
 
-    // ── Selling price always rounded UP to next whole peso ──
     data.sellingPrice = computeSellingPrice(
       data.cost || 0,
       data.markup || 0,
@@ -208,7 +204,6 @@ app.post("/sales", async (req, res) => {
     });
     await sale.save();
 
-    // ── Stock is always in PIECES, so just deduct qty directly ──
     if (productId) {
       const product = await Product.findById(productId);
       if (product) {
@@ -302,7 +297,7 @@ app.delete("/utang/customers/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── ASSETS ──
+// ── ASSETS ──────────────────────────────────────────────────────────────────
 app.get("/api/assets", async (req, res) => {
   try {
     const assets = await Asset.find().sort({ createdAt: -1 });
@@ -337,7 +332,6 @@ app.delete("/api/assets/:id", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 
-  // ── Keep-alive ping (prevents Render free tier from sleeping) ────────────
   const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 
   if (SELF_URL) {
