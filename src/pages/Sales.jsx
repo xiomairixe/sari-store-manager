@@ -5,10 +5,6 @@ import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./Month
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const CONFIRMED_KEY = "sari_confirmed_sales";
-const loadConfirmed = () => { try { return JSON.parse(localStorage.getItem(CONFIRMED_KEY) || "{}"); } catch { return {}; } };
-const saveConfirmed = (d) => localStorage.setItem(CONFIRMED_KEY, JSON.stringify(d));
-
 const S = {
   page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
   header: { padding: "20px 20px 10px", backgroundColor: "#f5f6fa", position: "sticky", top: 0, zIndex: 10 },
@@ -133,10 +129,10 @@ export default function Sales() {
   const [showModal, setShowModal] = useState(false);
   const [reviewDate, setReviewDate] = useState(null);
   const [form, setForm] = useState({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
-  const [confirmed, setConfirmedState] = useState(loadConfirmed);
+  const [confirmed, setConfirmedState] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { fetchSales(); fetchProducts(); }, []);
+  useEffect(() => { fetchSales(); fetchProducts(); fetchConfirmed(); }, []);
 
   const fetchSales = async () => {
     try { const res = await axios.get(`${BASE_URL}/sales`); setSales(res.data); } catch (err) { console.error(err); }
@@ -144,11 +140,19 @@ export default function Sales() {
   const fetchProducts = async () => {
     try { const res = await axios.get(`${BASE_URL}/products`); setProducts(res.data); } catch (err) { console.error(err); }
   };
+  const fetchConfirmed = async () => {
+    try { const res = await axios.get(`${BASE_URL}/sales/confirmed`); setConfirmedState(res.data); } catch (err) { console.error(err); }
+  };
 
-  const handleConfirm = (date, val) => {
-    const updated = { ...confirmed, [date]: val };
-    setConfirmedState(updated);
-    saveConfirmed(updated);
+  const handleConfirm = async (date, val) => {
+    // Optimistic update
+    setConfirmedState(prev => ({ ...prev, [date]: val }));
+    try {
+      await axios.put(`${BASE_URL}/sales/confirmed/${date}`, { confirmedAmount: val });
+    } catch (err) {
+      console.error(err);
+      fetchConfirmed(); // revert on failure
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -166,7 +170,6 @@ export default function Sales() {
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
 
-  // ── Apply tab + date range filter ────────────────────────────────────────
   const getFilteredSales = () => {
     if (activeTab === "Daily") {
       return sales.filter(s => new Date(s.saleDate).toDateString() === now.toDateString());
@@ -175,14 +178,12 @@ export default function Sales() {
       const w = new Date(now); w.setDate(now.getDate() - 6);
       return sales.filter(s => new Date(s.saleDate) >= w);
     }
-    // Range tab
     return filterByDateRange(sales, "saleDate", dateRange);
   };
 
   const filtered = getFilteredSales();
   const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
 
-  // Previous period comparison for range tab
   const rangeDays = (() => {
     const diff = new Date(dateRange.to) - new Date(dateRange.from);
     return Math.round(diff / (1000 * 60 * 60 * 24)) + 1;
@@ -198,7 +199,6 @@ export default function Sales() {
   const prevTotal = prevRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const changePct = prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(0) : null;
 
-  // Chart — day-by-day for selected range
   const chartData = (() => {
     const map = {};
     const start = new Date(activeTab === "Daily" ? todayStr : activeTab === "Weekly" ? (() => { const d = new Date(now); d.setDate(now.getDate() - 6); return d.toISOString().split("T")[0]; })() : dateRange.from);
