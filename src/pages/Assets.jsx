@@ -96,6 +96,14 @@ const S = {
   qtyHint:   { fontSize: "11px", color: "#9ca3af", textAlign: "center", marginTop: "8px" },
   divider:   { border: "none", borderTop: "1px solid #f3f4f6", margin: "4px 0 16px" },
 
+  // Lost quantity box
+  lostBox:   { backgroundColor: "#fff5f5", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #fecaca" },
+  lostTitle: { fontSize: "13px", fontWeight: "700", color: "#b91c1c", marginBottom: "6px" },
+  lostDesc:  { fontSize: "12px", color: "#9ca3af", marginBottom: "10px" },
+  lostRow:   { display: "flex", gap: "10px", alignItems: "center" },
+  lostInput: { flex: 1, border: "1.5px solid #fecaca", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#b91c1c", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" },
+  lostBtn:   { flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+
   emptyText: { textAlign: "center", color: "#9ca3af", padding: "30px 0", fontSize: "13px" },
   toast: (type) => ({ position: "fixed", bottom: "90px", left: "50%", transform: "translateX(-50%)", backgroundColor: type === "error" ? "#ef4444" : "#22c55e", color: "#fff", padding: "10px 22px", borderRadius: "24px", fontSize: "13px", fontWeight: "700", zIndex: 300, boxShadow: "0 4px 14px rgba(0,0,0,0.18)", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }),
 };
@@ -112,6 +120,7 @@ export default function Assets() {
   const [saving, setSaving]       = useState(false);
   const [toast, setToast]         = useState(null);
   const [qtyChange, setQtyChange] = useState("");
+  const [lostQty, setLostQty]     = useState("");   // ← NEW: quantity lost field
 
   useEffect(() => { fetchAssets(); }, []);
 
@@ -133,7 +142,7 @@ export default function Assets() {
   };
 
   const openAdd = () => {
-    setEditing(null); setForm(EMPTY_FORM); setQtyChange(""); setShowModal(true);
+    setEditing(null); setForm(EMPTY_FORM); setQtyChange(""); setLostQty(""); setShowModal(true);
   };
 
   const openEdit = (asset) => {
@@ -148,11 +157,12 @@ export default function Assets() {
       quantity:     asset.quantity != null ? asset.quantity : "",
     });
     setQtyChange("");
+    setLostQty("");   // ← reset lost qty on open
     setShowModal(true);
   };
 
   const closeModal = () => {
-    setShowModal(false); setEditing(null); setForm(EMPTY_FORM); setQtyChange("");
+    setShowModal(false); setEditing(null); setForm(EMPTY_FORM); setQtyChange(""); setLostQty("");
   };
 
   // +/- quantity buttons
@@ -163,6 +173,18 @@ export default function Assets() {
     const next    = Math.max(0, current + delta * change);
     setForm(f => ({ ...f, quantity: next }));
     setQtyChange("");
+  };
+
+  // ── NEW: apply lost quantity ──────────────────────────────────────────────
+  const applyLost = () => {
+    const lost = Number(lostQty);
+    if (!lost || lost <= 0) { showToast("Enter a valid lost quantity", "error"); return; }
+    const current = Number(form.quantity) || 0;
+    if (lost > current) { showToast("Lost qty cannot exceed current stock", "error"); return; }
+    const next = current - lost;
+    setForm(f => ({ ...f, quantity: next }));
+    setLostQty("");
+    showToast(`Deducted ${lost} from quantity`);
   };
 
   const handleSave = async () => {
@@ -362,10 +384,12 @@ export default function Assets() {
                   </>
                 )}
 
-                {/* EDIT MODE — quantity adjuster */}
+                {/* EDIT MODE — quantity adjuster + lost section */}
                 {editing && (
                   <>
                     <hr style={S.divider} />
+
+                    {/* Adjust Quantity */}
                     <div style={S.qtyBox}>
                       <div style={S.qtyTitle}>📦 Adjust Quantity</div>
                       <div style={S.qtyDisplay}>
@@ -384,6 +408,28 @@ export default function Assets() {
                         <button style={S.qtyBtn("#22c55e")} onClick={() => applyQty(+1)}>+</button>
                       </div>
                       <div style={S.qtyHint}>Enter amount · tap − to deduct or + to add</div>
+                    </div>
+
+                    {/* ── NEW: Lost / Damaged Quantity ── */}
+                    <div style={S.lostBox}>
+                      <div style={S.lostTitle}>⚠️ Lost / Damaged</div>
+                      <div style={S.lostDesc}>
+                        Log items that were lost, stolen, or damaged. This will deduct from current quantity.
+                      </div>
+                      <div style={S.lostRow}>
+                        <input
+                          style={S.lostInput}
+                          type="number"
+                          min="1"
+                          placeholder="Qty lost"
+                          value={lostQty}
+                          onChange={e => setLostQty(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && applyLost()}
+                        />
+                        <button style={S.lostBtn} onClick={applyLost}>
+                          Apply Loss
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
