@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+import DailyConfirmed from "./models/dailyConfirmed.js";
 
 dotenv.config();
 
@@ -212,6 +213,29 @@ app.post("/sales", async (req, res) => {
       }
     }
     res.status(201).json(sale);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── DAILY CONFIRMED ──
+app.get("/sales/confirmed", async (req, res) => {
+  try {
+    const records = await DailyConfirmed.find();
+    // Return as { "2025-03-08": 1500, ... } map for easy frontend lookup
+    const map = {};
+    records.forEach(r => { map[r.date] = r.confirmedAmount; });
+    res.json(map);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/sales/confirmed/:date", async (req, res) => {
+  try {
+    const { confirmedAmount } = req.body;
+    const record = await DailyConfirmed.findOneAndUpdate(
+      { date: req.params.date },
+      { confirmedAmount },
+      { new: true, upsert: true }
+    );
+    res.json(record);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
