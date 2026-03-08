@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import DailyConfirmed from "./models/dailyConfirmed.js";
+import DailyConfirmed from "./models/DailyConfirmed.js";
 
 dotenv.config();
 
