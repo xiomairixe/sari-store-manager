@@ -29,6 +29,7 @@ const S = {
   fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#1a1a2e", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 100 },
   overlay: { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
   modal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 100px", maxHeight: "90vh", overflowY: "auto" },
+  detailModal: { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "92vh", overflowY: "auto", display: "flex", flexDirection: "column" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
   modalTitle: { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
   closeBtn: { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
@@ -39,13 +40,180 @@ const S = {
   errorText: { color: "#ef4444", fontSize: "13px", marginBottom: "12px", padding: "10px 12px", backgroundColor: "#fff5f5", borderRadius: "8px", border: "1px solid #fca5a5" },
 };
 
+// ── Format date nicely ──
+const fmtDate = (d) => {
+  const date = new Date(d);
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) +
+    " · " + date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
+};
+
+// ── Customer Detail / Transaction History Modal ──
+function CustomerDetailModal({ customer, onClose, onAddUtang, onPayment }) {
+  const transactions = [...(customer.transactions || [])].reverse(); // newest first
+  const balance   = parseFloat(customer.balance  || 0);
+  const limit     = parseFloat(customer.creditLimit || 1000);
+  const exceeded  = balance > limit;
+  const pct       = limit > 0 ? (balance / limit) * 100 : 0;
+
+  const totalUtang   = transactions.filter(t => t.type === "utang"  ).reduce((s, t) => s + t.amount, 0);
+  const totalPayment = transactions.filter(t => t.type === "payment").reduce((s, t) => s + t.amount, 0);
+
+  return (
+    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={S.detailModal}>
+
+        {/* ── Fixed header ── */}
+        <div style={{ padding: "24px 20px 0", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+            <div>
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{customer.customerName}</h2>
+              {customer.phone && <p style={{ margin: "3px 0 0", color: "#9ca3af", fontSize: "12px" }}>📞 {customer.phone}</p>}
+            </div>
+            <button style={S.closeBtn} onClick={onClose}>✕</button>
+          </div>
+
+          {/* Status pill */}
+          <div style={{ margin: "12px 0 0" }}>
+            <span style={{
+              display: "inline-block", padding: "4px 14px", borderRadius: "99px",
+              fontSize: "12px", fontWeight: "700",
+              backgroundColor: customer.status === "paid" ? "#dcfce7" : customer.status === "partial" ? "#fef9c3" : "#fee2e2",
+              color: customer.status === "paid" ? "#16a34a" : customer.status === "partial" ? "#ca8a04" : "#ef4444",
+            }}>
+              {customer.status?.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Summary cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", margin: "14px 0 0" }}>
+            {[
+              { label: "Total Utang",  value: customer.amount,     color: "#ef4444", bg: "#fff5f5" },
+              { label: "Total Bayad",  value: customer.amountPaid, color: "#16a34a", bg: "#f0fdf4" },
+              { label: "Balance",      value: customer.balance,    color: exceeded ? "#ef4444" : "#1a1a2e", bg: exceeded ? "#fff5f5" : "#f9fafb" },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} style={{ backgroundColor: bg, borderRadius: "12px", padding: "10px 8px", textAlign: "center" }}>
+                <div style={{ fontSize: "10px", color: "#9ca3af", fontWeight: "600", marginBottom: "4px", textTransform: "uppercase" }}>{label}</div>
+                <div style={{ fontSize: "15px", fontWeight: "700", color }}>₱{parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 0 })}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Credit limit progress */}
+          <div style={{ margin: "12px 0 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#9ca3af", marginBottom: "5px" }}>
+              <span>Credit Used</span>
+              <span>{Math.min(Math.round(pct), 100)}% of ₱{limit.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
+            </div>
+            <div style={S.progressWrap}><div style={S.progressBar(pct, exceeded)} /></div>
+            {exceeded && <div style={{ fontSize: "11px", color: "#ef4444", fontWeight: "600" }}>⚠ Lagpas na sa credit limit</div>}
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: "8px", margin: "14px 0 16px" }}>
+            <button onClick={onAddUtang} style={{ ...S.addBtn, flex: 1 }}>+ Add Utang</button>
+            <button onClick={onPayment}  style={{ ...S.payBtn, flex: 1 }}>💵 Record Payment</button>
+          </div>
+
+          {/* Section label */}
+          <div style={{ fontSize: "13px", fontWeight: "700", color: "#374151", borderBottom: "1.5px solid #f3f4f6", paddingBottom: "10px", marginBottom: "0" }}>
+            Transaction History
+            <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: "600", backgroundColor: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: "20px" }}>
+              {transactions.length}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Scrollable transaction list ── */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 100px", WebkitOverflowScrolling: "touch" }}>
+          {transactions.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#9ca3af", padding: "40px 0", fontSize: "14px" }}>
+              Wala pang transactions.
+            </div>
+          ) : (
+            <>
+              {transactions.map((t, i) => {
+                const isUtang   = t.type === "utang";
+                const isLatest  = i === 0;
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "flex-start", gap: "12px",
+                    padding: "14px 0",
+                    borderBottom: i < transactions.length - 1 ? "1px solid #f3f4f6" : "none",
+                  }}>
+                    {/* Icon */}
+                    <div style={{
+                      width: "38px", height: "38px", borderRadius: "50%", flexShrink: 0,
+                      backgroundColor: isUtang ? "#fff5f5" : "#f0fdf4",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "16px",
+                    }}>
+                      {isUtang ? "📋" : "💵"}
+                    </div>
+
+                    {/* Details */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <span style={{
+                            fontSize: "13px", fontWeight: "700",
+                            color: isUtang ? "#ef4444" : "#16a34a",
+                          }}>
+                            {isUtang ? "Utang" : "Bayad"}
+                            {isLatest && (
+                              <span style={{ marginLeft: "6px", fontSize: "10px", backgroundColor: isUtang ? "#fee2e2" : "#dcfce7", color: isUtang ? "#ef4444" : "#16a34a", padding: "1px 6px", borderRadius: "20px", fontWeight: "700" }}>
+                                PINAKABAGO
+                              </span>
+                            )}
+                          </span>
+                          {t.notes ? (
+                            <p style={{ margin: "3px 0 0", fontSize: "12px", color: "#6b7280", lineHeight: "1.4" }}>{t.notes}</p>
+                          ) : null}
+                          <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#9ca3af" }}>📅 {fmtDate(t.createdAt)}</p>
+                        </div>
+                        <div style={{
+                          fontSize: "16px", fontWeight: "700", flexShrink: 0, marginLeft: "8px",
+                          color: isUtang ? "#ef4444" : "#16a34a",
+                        }}>
+                          {isUtang ? "+" : "−"}₱{parseFloat(t.amount).toLocaleString("en-PH", { minimumFractionDigits: 0 })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Running total footer */}
+              <div style={{ backgroundColor: "#f9fafb", borderRadius: "14px", padding: "14px 16px", margin: "16px 0 0" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "#374151", marginBottom: "10px" }}>Summary</div>
+                {[
+                  { label: `Total Utang (${transactions.filter(t => t.type === "utang").length}x)`,   value: totalUtang,   color: "#ef4444" },
+                  { label: `Total Bayad (${transactions.filter(t => t.type === "payment").length}x)`, value: totalPayment, color: "#16a34a" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#6b7280", marginBottom: "6px" }}>
+                    <span>{label}</span>
+                    <span style={{ fontWeight: "700", color }}>₱{value.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", fontWeight: "700", borderTop: "1px solid #e5e7eb", paddingTop: "10px", marginTop: "4px" }}>
+                  <span>Balance</span>
+                  <span style={{ color: balance > 0 ? "#ef4444" : "#16a34a" }}>₱{balance.toLocaleString("en-PH", { minimumFractionDigits: 0 })}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Utang() {
-  const [customers, setCustomers] = useState([]);
-  const [modal, setModal] = useState(null);
+  const [customers, setCustomers]           = useState([]);
+  const [modal, setModal]                   = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [form, setForm] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [form, setForm]                     = useState({});
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState("");
 
   useEffect(() => { fetchCustomers(); }, []);
 
@@ -54,13 +222,39 @@ export default function Utang() {
     catch (err) { console.error("Failed to fetch customers:", err); }
   };
 
+  // Re-fetch customer to get latest transactions before opening detail modal
+  const openDetail = async (customer) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/utang/customers`);
+      const fresh = res.data.find(c => c._id === customer._id) || customer;
+      setCustomers(res.data);
+      setSelectedCustomer(fresh);
+      setModal("detail");
+    } catch {
+      setSelectedCustomer(customer);
+      setModal("detail");
+    }
+  };
+
   const openModal = (type, customer = null) => {
     setSelectedCustomer(customer);
     setModal(type);
     setError("");
     if (type === "newCustomer") setForm({ customerName: "", phone: "", creditLimit: "1000" });
     if (type === "addUtang")    setForm({ amount: "", notes: "" });
-    if (type === "payment")     setForm({ amount: "" });
+    if (type === "payment")     setForm({ amount: "", notes: "" });
+  };
+
+  // Called from inside the detail modal
+  const openAddUtangFromDetail = () => {
+    setForm({ amount: "", notes: "" });
+    setError("");
+    setModal("addUtang");
+  };
+  const openPaymentFromDetail = () => {
+    setForm({ amount: "", notes: "" });
+    setError("");
+    setModal("payment");
   };
 
   const closeModal = () => { setModal(null); setSelectedCustomer(null); setForm({}); setError(""); setLoading(false); };
@@ -88,11 +282,14 @@ export default function Utang() {
     if (!form.amount || parseFloat(form.amount) <= 0) return setError("Please enter a valid amount.");
     setLoading(true);
     try {
-      await axios.post(`${BASE_URL}/utang/customers/${selectedCustomer._id}/add`, { // ✅ fixed
+      const res = await axios.post(`${BASE_URL}/utang/customers/${selectedCustomer._id}/add`, {
         amount: parseFloat(form.amount),
-        notes: form.notes || "",
+        notes:  form.notes || "",
       });
-      closeModal(); fetchCustomers();
+      // Update selectedCustomer with fresh data so detail modal reflects it
+      setSelectedCustomer(res.data);
+      closeModal();
+      fetchCustomers();
     } catch (err) {
       setError(err.response?.data?.error || "Failed to add utang. Please try again.");
     } finally { setLoading(false); }
@@ -104,10 +301,13 @@ export default function Utang() {
     if (!form.amount || parseFloat(form.amount) <= 0) return setError("Please enter a valid amount.");
     setLoading(true);
     try {
-      await axios.put(`${BASE_URL}/utang/customers/${selectedCustomer._id}/pay`, { // ✅ fixed
+      const res = await axios.put(`${BASE_URL}/utang/customers/${selectedCustomer._id}/pay`, {
         amountPaid: parseFloat(form.amount),
+        notes:      form.notes || "",
       });
-      closeModal(); fetchCustomers();
+      setSelectedCustomer(res.data);
+      closeModal();
+      fetchCustomers();
     } catch (err) {
       setError(err.response?.data?.error || "Failed to record payment. Please try again.");
     } finally { setLoading(false); }
@@ -116,13 +316,13 @@ export default function Utang() {
   const handleDeleteCustomer = async (customer) => {
     if (!window.confirm(`Delete ${customer.customerName}? This cannot be undone.`)) return;
     try {
-      await axios.delete(`${BASE_URL}/utang/customers/${customer._id}`); // ✅ fixed
+      await axios.delete(`${BASE_URL}/utang/customers/${customer._id}`);
       fetchCustomers();
-    } catch (err) { alert("Failed to delete customer."); }
+    } catch { alert("Failed to delete customer."); }
   };
 
   const totalOutstanding = customers.reduce((sum, c) => sum + parseFloat(c.balance || 0), 0);
-  const debtors = customers.filter(c => parseFloat(c.balance || 0) > 0);
+  const debtors          = customers.filter(c => parseFloat(c.balance || 0) > 0);
 
   return (
     <>
@@ -132,6 +332,7 @@ export default function Utang() {
         <div style={S.header}><h1 style={S.title}>Customer Credit (Utang)</h1></div>
 
         <div style={S.body}>
+          {/* Summary card */}
           <div style={S.totalCard}>
             <div>
               <div style={S.totalLabel}>Total Outstanding</div>
@@ -148,122 +349,111 @@ export default function Utang() {
 
           {customers.length === 0 ? (
             <div style={S.emptyText}>No customers yet. Tap + to add one.</div>
-          ) : (
-            customers.map((c) => {
-              const balance = parseFloat(c.balance || 0);
-              const limit   = parseFloat(c.creditLimit || 1000);
-              const pct     = limit > 0 ? (balance / limit) * 100 : 0;
-              const exceeded = balance > limit;
-              return (
-                <div key={c._id} style={S.customerCard(exceeded)}> {/* ✅ fixed */}
-                  <div style={S.cardTop}>
-                    <div>
-                      <p style={S.customerName}>{c.customerName}</p>
-                      {c.phone && (
-                        <div style={S.customerPhone}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z" /></svg>
-                          {c.phone}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div style={S.balanceAmount(exceeded)}>₱{balance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                      <div style={S.limitText}>Limit: ₱{limit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                    </div>
+          ) : customers.map((c) => {
+            const balance  = parseFloat(c.balance || 0);
+            const limit    = parseFloat(c.creditLimit || 1000);
+            const pct      = limit > 0 ? (balance / limit) * 100 : 0;
+            const exceeded = balance > limit;
+            const txCount  = c.transactions?.length || 0;
+            return (
+              <div key={c._id} style={S.customerCard(exceeded)}>
+                <div style={S.cardTop}>
+                  <div>
+                    <p style={S.customerName}>{c.customerName}</p>
+                    {c.phone && (
+                      <div style={S.customerPhone}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z" /></svg>
+                        {c.phone}
+                      </div>
+                    )}
+                    {/* Transaction count badge */}
+                    {txCount > 0 && (
+                      <div style={{ marginTop: "4px", fontSize: "11px", color: "#6b7280" }}>
+                        📋 {txCount} transaction{txCount !== 1 ? "s" : ""}
+                      </div>
+                    )}
                   </div>
-                  <div style={S.progressWrap}><div style={S.progressBar(pct, exceeded)} /></div>
-                  <div style={S.btnRow}>
-                    <button style={S.addBtn} onClick={() => openModal("addUtang", c)}>+ Add Utang</button>
-                    <button style={S.payBtn} onClick={() => openModal("payment", c)}>Record Payment</button>
-                    <button style={S.viewBtn} onClick={() => openModal("review", c)}>View</button>
-                    <button style={S.deleteBtn} onClick={() => handleDeleteCustomer(c)}>🗑</button>
+                  <div>
+                    <div style={S.balanceAmount(exceeded)}>₱{balance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                    <div style={S.limitText}>Limit: ₱{limit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                    {/* Status pill */}
+                    <div style={{ textAlign: "right", marginTop: "4px" }}>
+                      <span style={{
+                        fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "20px",
+                        backgroundColor: c.status === "paid" ? "#dcfce7" : c.status === "partial" ? "#fef9c3" : "#fee2e2",
+                        color: c.status === "paid" ? "#16a34a" : c.status === "partial" ? "#ca8a04" : "#ef4444",
+                      }}>
+                        {c.status?.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              );
-            })
-          )}
+
+                <div style={S.progressWrap}><div style={S.progressBar(pct, exceeded)} /></div>
+
+                <div style={S.btnRow}>
+                  <button style={S.addBtn} onClick={() => openModal("addUtang", c)}>+ Utang</button>
+                  <button style={S.payBtn} onClick={() => openModal("payment", c)}>💵 Bayad</button>
+                  <button style={S.viewBtn} onClick={() => openDetail(c)}>📋 View</button>
+                  <button style={S.deleteBtn} onClick={() => handleDeleteCustomer(c)}>🗑</button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <button style={S.fab} onClick={() => openModal("newCustomer")}>+</button>
 
-        {/* Review Modal */}
-        {modal === "review" && selectedCustomer && (
-          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
-            <div style={S.modal}>
-              <div style={S.modalHeader}>
-                <h2 style={S.modalTitle}>{selectedCustomer.customerName}</h2>
-                <button style={S.closeBtn} onClick={closeModal}>✕</button>
-              </div>
-              {selectedCustomer.phone && <p style={{ margin: "0 0 16px", color: "#9ca3af", fontSize: "13px" }}>📞 {selectedCustomer.phone}</p>}
-              {[
-                { label: "Total Debt",   value: selectedCustomer.amount,      color: "#ef4444" },
-                { label: "Total Paid",   value: selectedCustomer.amountPaid,  color: "#16a34a" },
-                { label: "Balance",      value: selectedCustomer.balance,     color: parseFloat(selectedCustomer.balance) > 0 ? "#ef4444" : "#16a34a" },
-                { label: "Credit Limit", value: selectedCustomer.creditLimit, color: "#4f46e5" },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <span style={{ fontSize: "14px", color: "#6b7280" }}>{label}</span>
-                  <span style={{ fontSize: "16px", fontWeight: "700", color }}>₱{parseFloat(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: "16px", textAlign: "center" }}>
-                <span style={{ display: "inline-block", padding: "6px 20px", borderRadius: "99px", fontSize: "13px", fontWeight: "700", backgroundColor: selectedCustomer.status === "paid" ? "#dcfce7" : selectedCustomer.status === "partial" ? "#fef9c3" : "#fee2e2", color: selectedCustomer.status === "paid" ? "#16a34a" : selectedCustomer.status === "partial" ? "#ca8a04" : "#ef4444" }}>
-                  {selectedCustomer.status?.toUpperCase()}
-                </span>
-              </div>
-              <div style={{ marginTop: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#9ca3af", marginBottom: "6px" }}>
-                  <span>Credit Usage</span>
-                  <span>{Math.min(Math.round((parseFloat(selectedCustomer.balance) / parseFloat(selectedCustomer.creditLimit || 1)) * 100), 100)}%</span>
-                </div>
-                <div style={S.progressWrap}>
-                  <div style={S.progressBar((parseFloat(selectedCustomer.balance) / parseFloat(selectedCustomer.creditLimit || 1)) * 100, parseFloat(selectedCustomer.balance) > parseFloat(selectedCustomer.creditLimit))} />
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* ── Detail Modal with Transaction History ── */}
+        {modal === "detail" && selectedCustomer && (
+          <CustomerDetailModal
+            customer={selectedCustomer}
+            onClose={closeModal}
+            onAddUtang={openAddUtangFromDetail}
+            onPayment={openPaymentFromDetail}
+          />
         )}
 
-        {/* New Customer Modal */}
+        {/* ── New Customer Modal ── */}
         {modal === "newCustomer" && (
-          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div style={S.overlay} onClick={e => e.target === e.currentTarget && closeModal()}>
             <div style={S.modal}>
-              <div style={S.modalHeader}><h2 style={S.modalTitle}>New Customer</h2><button style={S.closeBtn} onClick={closeModal}>✕</button></div>
+              <div style={S.modalHeader}><h2 style={{ ...S.modalTitle }}>New Customer</h2><button style={S.closeBtn} onClick={closeModal}>✕</button></div>
               {error && <div style={S.errorText}>{error}</div>}
               <form onSubmit={handleNewCustomer}>
                 <label style={S.label}>Full Name *</label>
-                <input style={S.input} placeholder="e.g. Ate Lorna Cruz" value={form.customerName || ""} onChange={(e) => setForm({ ...form, customerName: e.target.value })} autoFocus />
+                <input style={S.input} placeholder="e.g. Ate Lorna Cruz" value={form.customerName || ""} onChange={e => setForm({ ...form, customerName: e.target.value })} autoFocus />
                 <label style={S.label}>Phone Number</label>
-                <input style={S.input} placeholder="09..." value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <input style={S.input} placeholder="09..." value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} />
                 <label style={S.label}>Credit Limit (₱)</label>
-                <input style={S.input} type="number" min="0" step="0.01" placeholder="1000" value={form.creditLimit || ""} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} />
+                <input style={S.input} type="number" min="0" step="0.01" placeholder="1000" value={form.creditLimit || ""} onChange={e => setForm({ ...form, creditLimit: e.target.value })} />
                 <button type="submit" style={S.submitBtn("#1a1a2e")} disabled={loading}>{loading ? "Adding..." : "Add Customer"}</button>
               </form>
             </div>
           </div>
         )}
 
-        {/* Add Utang Modal */}
+        {/* ── Add Utang Modal ── */}
         {modal === "addUtang" && selectedCustomer && (
-          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div style={S.overlay} onClick={e => e.target === e.currentTarget && closeModal()}>
             <div style={S.modal}>
               <div style={S.modalHeader}><h2 style={S.modalTitle}>Add Utang</h2><button style={S.closeBtn} onClick={closeModal}>✕</button></div>
               <p style={{ margin: "0 0 16px", color: "#9ca3af", fontSize: "13px" }}>Customer: <strong style={{ color: "#1a1a2e" }}>{selectedCustomer.customerName}</strong></p>
               {error && <div style={S.errorText}>{error}</div>}
               <form onSubmit={handleAddUtang}>
                 <label style={S.label}>Amount (₱)</label>
-                <input style={S.input} type="number" step="0.01" min="0.01" placeholder="0.00" value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} autoFocus />
-                <label style={S.label}>Notes (optional)</label>
-                <input style={S.input} placeholder="e.g. 2 cans of corned beef" value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                <input style={S.input} type="number" step="0.01" min="0.01" placeholder="0.00" value={form.amount || ""} onChange={e => setForm({ ...form, amount: e.target.value })} autoFocus />
+                <label style={S.label}>Notes (kung ano ang inutang)</label>
+                <input style={S.input} placeholder="e.g. 2 cans na corned beef, 1 softdrinks" value={form.notes || ""} onChange={e => setForm({ ...form, notes: e.target.value })} />
                 <button type="submit" style={S.submitBtn("#ef4444")} disabled={loading}>{loading ? "Adding..." : "Add Utang"}</button>
               </form>
             </div>
           </div>
         )}
 
-        {/* Payment Modal */}
+        {/* ── Payment Modal ── */}
         {modal === "payment" && selectedCustomer && (
-          <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div style={S.overlay} onClick={e => e.target === e.currentTarget && closeModal()}>
             <div style={S.modal}>
               <div style={S.modalHeader}><h2 style={S.modalTitle}>Record Payment</h2><button style={S.closeBtn} onClick={closeModal}>✕</button></div>
               <p style={{ margin: "0 0 4px", color: "#9ca3af", fontSize: "13px" }}>Customer: <strong style={{ color: "#1a1a2e" }}>{selectedCustomer.customerName}</strong></p>
@@ -271,7 +461,9 @@ export default function Utang() {
               {error && <div style={S.errorText}>{error}</div>}
               <form onSubmit={handlePayment}>
                 <label style={S.label}>Amount Paid (₱)</label>
-                <input style={S.input} type="number" step="0.01" min="0.01" placeholder="0.00" value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} autoFocus />
+                <input style={S.input} type="number" step="0.01" min="0.01" placeholder="0.00" value={form.amount || ""} onChange={e => setForm({ ...form, amount: e.target.value })} autoFocus />
+                <label style={S.label}>Notes (optional)</label>
+                <input style={S.input} placeholder="e.g. Bayad sa utang nung Lunes" value={form.notes || ""} onChange={e => setForm({ ...form, notes: e.target.value })} />
                 <button type="submit" style={S.submitBtn("#16a34a")} disabled={loading}>{loading ? "Recording..." : "Record Payment"}</button>
               </form>
             </div>

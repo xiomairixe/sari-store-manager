@@ -67,7 +67,7 @@ const deleteCloudinaryImage = async (imageUrl) => {
   }
 };
 
-// ── Helper: parse numeric fields from FormData (all come in as strings) ──
+// ── Helper: parse numeric fields from FormData ──
 const BULK_UNITS = ["pack", "box"];
 
 const parseProductFields = (body) => {
@@ -83,15 +83,18 @@ const parseProductFields = (body) => {
   return data;
 };
 
-// ── Helper: compute selling price — always ceil to next whole peso ──
+// ── Helper: compute selling price ──
 const computeSellingPrice = (cost, markup, unit, pcsPerUnit) => {
   const isBulk = BULK_UNITS.includes(unit);
   if (isBulk && pcsPerUnit && pcsPerUnit > 0) {
-    const costPerPc = cost / pcsPerUnit;
-    return Math.ceil(costPerPc * (1 + markup / 100));
+    return Math.ceil((cost / pcsPerUnit) * (1 + markup / 100));
   }
   return Math.ceil(cost * (1 + markup / 100));
 };
+
+// ── Helper: handle duplicate key error ──
+const isDuplicateKeyError = (err) =>
+  err.code === 11000 || (err.message && err.message.includes("duplicate key"));
 
 // ── Models ──
 import Product from "./models/product.js";
@@ -100,7 +103,7 @@ import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
 import Asset from "./models/asset.js";
 
-// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
+// ── HEALTH CHECK ──
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -130,10 +133,12 @@ app.post("/products", upload.single("image"), async (req, res) => {
     const data = parseProductFields(req.body);
     if (req.file) data.image = req.file.path;
 
+    // Frontend always sends stockInPacks="true" for bulk units (stock entered as packs)
     const isBulk = BULK_UNITS.includes(data.unit);
-    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0) {
+    if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0 && data.stockInPacks === "true") {
       data.stock = (data.stock || 0) * data.pcsPerUnit;
     }
+    delete data.stockInPacks;
 
     data.sellingPrice = computeSellingPrice(
       data.cost || 0,
@@ -142,10 +147,24 @@ app.post("/products", upload.single("image"), async (req, res) => {
       data.pcsPerUnit
     );
 
+    // Record initial price in history
+    data.priceHistory = [{
+      cost: data.cost || 0,
+      markup: data.markup || 0,
+      sellingPrice: data.sellingPrice,
+      changedAt: new Date(),
+      note: "Initial price",
+    }];
+
     const product = new Product(data);
     await product.save();
     res.status(201).json(product);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return res.status(409).json({ error: "DUPLICATE", message: "Mayroon nang product na may ganitong pangalan." });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.put("/products/:id", upload.single("image"), async (req, res) => {
@@ -164,18 +183,48 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
     }
     delete data.stockInPacks;
 
-    data.sellingPrice = computeSellingPrice(
+    const newSellingPrice = computeSellingPrice(
       data.cost || 0,
       data.markup || 0,
       data.unit,
       data.pcsPerUnit
     );
-
+    data.sellingPrice = newSellingPrice;
     data.updatedAt = new Date();
 
-    const updated = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
+    // Check if cost or markup changed → push to price history
+    const existing = await Product.findById(req.params.id);
+    if (existing) {
+      const costChanged   = existing.cost         !== data.cost;
+      const markupChanged = existing.markup       !== data.markup;
+      const priceChanged  = existing.sellingPrice !== newSellingPrice;
+
+      if (costChanged || markupChanged || priceChanged) {
+        data.$push = {
+          priceHistory: {
+            cost:         data.cost,
+            markup:       data.markup,
+            sellingPrice: newSellingPrice,
+            changedAt:    new Date(),
+            note:         `Cost: ₱${existing.cost}→₱${data.cost}, SP: ₱${existing.sellingPrice}→₱${newSellingPrice}`,
+          },
+        };
+      }
+    }
+
+    // Separate $push from the flat update fields
+    const { $push, ...flatData } = data;
+    const updatePayload = { ...flatData };
+    if ($push) updatePayload.$push = $push;
+
+    const updated = await Product.findByIdAndUpdate(req.params.id, updatePayload, { new: true, runValidators: true });
     res.json(updated);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return res.status(409).json({ error: "DUPLICATE", message: "Mayroon nang product na may ganitong pangalan." });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete("/products/:id", async (req, res) => {
@@ -220,7 +269,6 @@ app.post("/sales", async (req, res) => {
 app.get("/sales/confirmed", async (req, res) => {
   try {
     const records = await DailyConfirmed.find();
-    // Return as { "2025-03-08": 1500, ... } map for easy frontend lookup
     const map = {};
     records.forEach(r => { map[r.date] = r.confirmedAmount; });
     res.json(map);
@@ -321,7 +369,7 @@ app.delete("/utang/customers/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── ASSETS ──────────────────────────────────────────────────────────────────
+// ── ASSETS ──
 app.get("/api/assets", async (req, res) => {
   try {
     const assets = await Asset.find().sort({ createdAt: -1 });

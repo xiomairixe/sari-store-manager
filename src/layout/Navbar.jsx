@@ -58,8 +58,9 @@ const navItems = [
     label: "Assets",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-        <rect x="2" y="5" width="20" height="14" rx="2" />
-        <line x1="2" y1="10" x2="22" y2="10" />
+        <rect x="3" y="10" width="18" height="11" rx="1" />
+        <path d="M3 10l9-7 9 7" />
+        <rect x="9" y="14" width="6" height="7" />
       </svg>
     ),
   },
