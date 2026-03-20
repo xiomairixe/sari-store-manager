@@ -322,41 +322,63 @@ app.post("/utang/customers", async (req, res) => {
   try {
     const customer = new Utang({
       customerName: req.body.customerName,
-      phone: req.body.phone || "",
-      creditLimit: req.body.creditLimit || 1000,
+      phone:        req.body.phone || "",
+      creditLimit:  req.body.creditLimit || 1000,
       amount: 0, amountPaid: 0, balance: 0, status: "unpaid",
+      transactions: [],   // ← bago
     });
     await customer.save();
     res.status(201).json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// NAG-PUSH NA NG TRANSACTION + NOTES
 app.post("/utang/customers/:id/add", async (req, res) => {
   try {
     const { amount, notes } = req.body;
     const customer = await Utang.findById(req.params.id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
-    customer.amount += parseFloat(amount);
-    customer.balance = customer.amount - customer.amountPaid;
-    if (customer.balance <= 0) customer.status = "paid";
-    else if (customer.amountPaid > 0) customer.status = "partial";
-    else customer.status = "unpaid";
-    if (notes) customer.notes = notes;
+
+    customer.amount  += parseFloat(amount);
+    customer.balance  = customer.amount - customer.amountPaid;
+    customer.status   = customer.balance <= 0 ? "paid"
+                      : customer.amountPaid > 0 ? "partial"
+                      : "unpaid";
+
+    // ← ITO ANG KULANG SA DATI MONG SERVER
+    customer.transactions.push({
+      type:      "utang",
+      amount:    parseFloat(amount),
+      notes:     notes || "",
+      createdAt: new Date(),
+    });
+
     await customer.save();
     res.json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// NAG-PUSH NA RIN NG TRANSACTION SA PAYMENT
 app.put("/utang/customers/:id/pay", async (req, res) => {
   try {
-    const { amountPaid } = req.body;
+    const { amountPaid, notes } = req.body;
     const customer = await Utang.findById(req.params.id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
+
     customer.amountPaid += parseFloat(amountPaid);
-    customer.balance = customer.amount - customer.amountPaid;
-    if (customer.balance <= 0) customer.status = "paid";
-    else if (customer.amountPaid > 0) customer.status = "partial";
-    else customer.status = "unpaid";
+    customer.balance     = customer.amount - customer.amountPaid;
+    customer.status      = customer.balance <= 0 ? "paid"
+                         : customer.amountPaid > 0 ? "partial"
+                         : "unpaid";
+
+    // ← ITO RIN ANG KULANG
+    customer.transactions.push({
+      type:      "payment",
+      amount:    parseFloat(amountPaid),
+      notes:     notes || "",
+      createdAt: new Date(),
+    });
+
     await customer.save();
     res.json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
