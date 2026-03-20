@@ -152,26 +152,41 @@ function CustomerDetailModal({ customer, onClose, onAddUtang, onPayment }) {
 
                     {/* Details */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <span style={{
-                            fontSize: "13px", fontWeight: "700",
-                            color: isUtang ? "#ef4444" : "#16a34a",
-                          }}>
-                            {isUtang ? "Utang" : "Bayad"}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Type + badge */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "5px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: "700", color: isUtang ? "#ef4444" : "#16a34a" }}>
+                              {isUtang ? "Utang" : "Bayad"}
+                            </span>
                             {isLatest && (
-                              <span style={{ marginLeft: "6px", fontSize: "10px", backgroundColor: isUtang ? "#fee2e2" : "#dcfce7", color: isUtang ? "#ef4444" : "#16a34a", padding: "1px 6px", borderRadius: "20px", fontWeight: "700" }}>
+                              <span style={{ fontSize: "10px", backgroundColor: isUtang ? "#fee2e2" : "#dcfce7", color: isUtang ? "#ef4444" : "#16a34a", padding: "1px 6px", borderRadius: "20px", fontWeight: "700" }}>
                                 PINAKABAGO
                               </span>
                             )}
-                          </span>
+                          </div>
+
+                          {/* Notes — prominently displayed */}
                           {t.notes ? (
-                            <p style={{ margin: "3px 0 0", fontSize: "12px", color: "#6b7280", lineHeight: "1.4" }}>{t.notes}</p>
-                          ) : null}
-                          <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#9ca3af" }}>📅 {fmtDate(t.createdAt)}</p>
+                            <div style={{
+                              backgroundColor: isUtang ? "#fff5f5" : "#f0fdf4",
+                              border: `1px solid ${isUtang ? "#fecaca" : "#bbf7d0"}`,
+                              borderRadius: "8px",
+                              padding: "7px 10px",
+                              marginBottom: "5px",
+                            }}>
+                              <p style={{ margin: 0, fontSize: "13px", fontWeight: "500", color: "#1a1a2e", lineHeight: "1.45" }}>
+                                {t.notes}
+                              </p>
+                            </div>
+                          ) : (
+                            <p style={{ margin: "0 0 5px", fontSize: "12px", color: "#d1d5db", fontStyle: "italic" }}>Walang notes</p>
+                          )}
+
+                          <p style={{ margin: 0, fontSize: "11px", color: "#9ca3af" }}>📅 {fmtDate(t.createdAt)}</p>
                         </div>
                         <div style={{
-                          fontSize: "16px", fontWeight: "700", flexShrink: 0, marginLeft: "8px",
+                          fontSize: "16px", fontWeight: "700", flexShrink: 0,
                           color: isUtang ? "#ef4444" : "#16a34a",
                         }}>
                           {isUtang ? "+" : "−"}₱{parseFloat(t.amount).toLocaleString("en-PH", { minimumFractionDigits: 0 })}
