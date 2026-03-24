@@ -227,6 +227,8 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
   }
 });
 
+
+
 app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);

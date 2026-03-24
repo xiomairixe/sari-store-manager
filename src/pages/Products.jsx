@@ -8,8 +8,8 @@ const API_URL = `${BASE_URL}/products`;
 
 const getImageUrl = (image) => {
   if (!image) return null;
-  if (image.startsWith("http")) return image;
-  return `${BASE_URL}/uploads/${image}`;
+  if (image.startsWith("http")) return image;   // ← external URL, gamitin directly
+  return `${BASE_URL}/uploads/${image}`;         // ← uploaded file
 };
 
 const CATEGORIES = [
@@ -108,6 +108,7 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [filterEssential, setFilterEssential] = useState(false); // ⭐ filter toggle
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -141,6 +142,21 @@ export default function Products() {
     catch (err) { console.error(err); }
   };
 
+  // ── Toggle star (essential) ──────────────────────────────────────────────
+  const toggleEssential = async (e, product) => {
+    e.stopPropagation(); // don't trigger long-press or other handlers
+    try {
+      const res = await axios.patch(`${API_URL}/${product._id}/essential`);
+      // Optimistically update in local state
+      setProducts(prev => prev.map(p => p._id === product._id ? res.data : p));
+      showToast(
+        res.data.isEssential
+          ? `⭐ "${product.name}" marked as essential`
+          : `"${product.name}" removed from essential`,
+      );
+    } catch { showToast("Failed to update.", "error"); }
+  };
+
   const handleChange = (e) => {
     const updated = { ...form, [e.target.name]: e.target.value };
     if (e.target.name === "unit" && !BULK_UNITS.includes(e.target.value)) updated.pcsPerUnit = "";
@@ -152,6 +168,18 @@ export default function Products() {
     if (!file) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+  };
+
+  // ── When user pastes a URL into the image field, show preview ──
+  const handleImageUrlChange = (e) => {
+    handleChange(e);
+    const val = e.target.value.trim();
+    if (val.startsWith("http")) {
+      setImagePreview(val);
+      setImageFile(null); // clear any uploaded file
+    } else if (!val) {
+      setImagePreview(null);
+    }
   };
 
   const calcSellingPrice = () => {
@@ -178,8 +206,6 @@ export default function Products() {
   const openEdit = (product) => {
     const isCustom = !CATEGORIES.includes(product.category);
     const isBulkProduct = BULK_UNITS.includes(product.unit);
-
-    // ── DB stores stock in pcs for bulk. Convert back to packs for the form. ──
     const stockInForm = isBulkProduct && product.pcsPerUnit && parseFloat(product.pcsPerUnit) > 0
       ? Math.round(parseFloat(product.stock) / parseFloat(product.pcsPerUnit))
       : product.stock;
@@ -193,12 +219,13 @@ export default function Products() {
       pcsPerUnit: product.pcsPerUnit || "",
       cost: product.cost,
       markup: product.markup,
-      stock: stockInForm,        // ← packs, not pcs
+      stock: stockInForm,
       reorder: product.reorder || 10,
       expiry: product.expiry ? product.expiry.split("T")[0] : "",
       supplier: product.supplier || "",
     });
     setEditId(product._id);
+    // ── Show preview for both URL and uploaded images ──
     setImagePreview(getImageUrl(product.image) || null);
     setImageFile(null);
     setShowModal(true);
@@ -218,13 +245,11 @@ export default function Products() {
       submitForm.sellingPrice = calcSellingPrice();
 
       const fd = new FormData();
-      // ── For both ADD and EDIT of bulk products, stock entered is in packs.
-      //    Tell server to multiply by pcsPerUnit. ──
       if (isBulkUnit) fd.append("stockInPacks", "true");
-
       Object.entries(submitForm).forEach(([k, v]) => {
         if (v !== undefined && v !== null) fd.append(k, v);
       });
+      // ── Only append file if user uploaded one; otherwise the URL string is already in form.image ──
       if (imageFile) fd.append("image", imageFile);
 
       const headers = { "Content-Type": "multipart/form-data" };
@@ -263,15 +288,27 @@ export default function Products() {
     setContextMenu({ x: touch.clientX, y: touch.clientY, product });
   };
 
+  // ── Filtering + sorting ──────────────────────────────────────────────────
   const filtered = products
-    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && (activeCategory === "All" || p.category === activeCategory))
-    .sort((a, b) => { const aO = parseInt(a.stock) === 0; const bO = parseInt(b.stock) === 0; return aO === bO ? 0 : aO ? 1 : -1; });
+    .filter(p =>
+      p.name.toLowerCase().includes(search.toLowerCase()) &&
+      (activeCategory === "All" || p.category === activeCategory) &&
+      (!filterEssential || p.isEssential)
+    )
+    .sort((a, b) => {
+      // Essential products float to top, then out-of-stock sink to bottom
+      if (a.isEssential !== b.isEssential) return a.isEssential ? -1 : 1;
+      const aO = parseInt(a.stock) === 0;
+      const bO = parseInt(b.stock) === 0;
+      return aO === bO ? 0 : aO ? 1 : -1;
+    });
 
-  const outOfStockCount = products.filter(p => parseInt(p.stock) === 0).length;
+  const outOfStockCount   = products.filter(p => parseInt(p.stock) === 0).length;
+  const essentialLowCount = products.filter(p => p.isEssential && parseInt(p.stock) <= (p.reorder || 10)).length;
 
-  const inp = { width:"100%", border:"1.5px solid #e5e7eb", borderRadius:"10px", padding:"10px 14px", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", color:"#1a1a2e", outline:"none", boxSizing:"border-box", backgroundColor:"#fff" };
+  const inp   = { width:"100%", border:"1.5px solid #e5e7eb", borderRadius:"10px", padding:"10px 14px", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", color:"#1a1a2e", outline:"none", boxSizing:"border-box", backgroundColor:"#fff" };
   const inpHL = { ...inp, border:"1.5px solid #f97316", backgroundColor:"#fff8f0" };
-  const lbl = { fontSize:"13px", fontWeight:"600", color:"#374151", marginBottom:"6px", display:"block" };
+  const lbl   = { fontSize:"13px", fontWeight:"600", color:"#374151", marginBottom:"6px", display:"block" };
 
   const NAVBAR_H = 64;
 
@@ -288,6 +325,15 @@ export default function Products() {
           -webkit-overflow-scrolling: touch;
           padding: 24px 20px 100px;
         }
+        .star-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          line-height: 1;
+          transition: transform 0.15s ease;
+        }
+        .star-btn:active { transform: scale(1.3); }
       `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <Toast toasts={toasts} />
@@ -300,13 +346,23 @@ export default function Products() {
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 20px 10px", backgroundColor:"#f5f6fa", position:"sticky", top:0, zIndex:10 }}>
           <div>
             <h1 style={{ fontSize:"26px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>Inventory</h1>
-            {outOfStockCount > 0 && <div style={{ fontSize:"12px", color:"#ef4444", fontWeight:"600", marginTop:"2px" }}>⚠ {outOfStockCount} item{outOfStockCount!==1?"s":""} out of stock</div>}
+            <div style={{ display:"flex", gap:"10px", marginTop:"2px", flexWrap:"wrap" }}>
+              {outOfStockCount > 0 && (
+                <div style={{ fontSize:"12px", color:"#ef4444", fontWeight:"600" }}>⚠ {outOfStockCount} out of stock</div>
+              )}
+              {essentialLowCount > 0 && (
+                <div style={{ fontSize:"12px", color:"#d97706", fontWeight:"600" }}>⭐ {essentialLowCount} essential low</div>
+              )}
+            </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <button onClick={() => navigate("/suppliers")} style={{ display:"flex", alignItems:"center", gap:"6px", backgroundColor:"#fff", border:"1.5px solid #e5e7eb", borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color:"#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>🏪 Suppliers</button>
-            <button style={{ width:"42px", height:"42px", borderRadius:"50%", backgroundColor:"#fff8f0", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#f97316", boxShadow:"0 2px 8px rgba(249,115,22,0.15)" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            {/* Essential filter toggle */}
+            <button
+              onClick={() => setFilterEssential(f => !f)}
+              style={{ display:"flex", alignItems:"center", gap:"5px", backgroundColor: filterEssential ? "#fef9c3" : "#fff", border: `1.5px solid ${filterEssential ? "#eab308" : "#e5e7eb"}`, borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color: filterEssential ? "#a16207" : "#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+              ⭐ {filterEssential ? "Essential" : "All"}
             </button>
+            <button onClick={() => navigate("/suppliers")} style={{ display:"flex", alignItems:"center", gap:"6px", backgroundColor:"#fff", border:"1.5px solid #e5e7eb", borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color:"#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>🏪 Suppliers</button>
           </div>
         </div>
 
@@ -328,34 +384,71 @@ export default function Products() {
         {/* Product List */}
         <div style={{ padding:"8px 20px", display:"flex", flexDirection:"column", gap:"12px" }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign:"center", color:"#9ca3af", padding:"40px 0", fontSize:"14px" }}>No products found.</div>
+            <div style={{ textAlign:"center", color:"#9ca3af", padding:"40px 0", fontSize:"14px" }}>
+              {filterEssential ? "Walang essential products pa. I-star ang mga important." : "No products found."}
+            </div>
           ) : filtered.map(product => {
-            const isBulk = BULK_UNITS.includes(product.unit);
+            const isBulk     = BULK_UNITS.includes(product.unit);
             const missingPcs = isBulk && (!product.pcsPerUnit || parseFloat(product.pcsPerUnit) <= 0);
-            const sp = computeSellingPrice(product);
-            const stockPcs = parseInt(product.stock); // always pcs in DB
+            const sp         = computeSellingPrice(product);
+            const stockPcs   = parseInt(product.stock);
             const outOfStock = stockPcs === 0;
+            const isLow      = !outOfStock && stockPcs <= (product.reorder || 10);
             const historyCount = product.priceHistory?.length || 0;
+            const essential  = product.isEssential;
 
-            // Show "50 pcs (1 pack)" for bulk products
             const stockLabel = isBulk && product.pcsPerUnit && parseFloat(product.pcsPerUnit) > 0
               ? `${stockPcs} pcs (${Math.floor(stockPcs / parseFloat(product.pcsPerUnit))} ${product.unit}s)`
               : `${stockPcs} pcs`;
 
             return (
               <div key={product._id}
-                style={{ backgroundColor:outOfStock?"#f9fafb":"#fff", borderRadius:"16px", padding:"14px", display:"flex", gap:"14px", alignItems:"center", boxShadow:outOfStock?"none":"0 1px 4px rgba(0,0,0,0.06)", position:"relative", cursor:"pointer", border:outOfStock?"1.5px solid #e5e7eb":"1.5px solid transparent", opacity:outOfStock?0.75:1 }}
+                style={{
+                  backgroundColor: outOfStock ? "#f9fafb" : "#fff",
+                  borderRadius:"16px",
+                  padding:"14px",
+                  display:"flex", gap:"14px", alignItems:"center",
+                  boxShadow: outOfStock ? "none" : essential ? "0 0 0 2px #eab308, 0 1px 4px rgba(0,0,0,0.06)" : "0 1px 4px rgba(0,0,0,0.06)",
+                  position:"relative", cursor:"pointer",
+                  border: outOfStock ? "1.5px solid #e5e7eb" : "1.5px solid transparent",
+                  opacity: outOfStock ? 0.75 : 1,
+                }}
                 onContextMenu={e => { e.preventDefault(); handleLongPress(e, product); }}
                 onTouchStart={e => { const t = setTimeout(() => handleLongPress(e, product), 500); e.currentTarget._t = t; }}
                 onTouchEnd={e => clearTimeout(e.currentTarget._t)}
               >
-                {getImageUrl(product.image)
-                  ? <img src={getImageUrl(product.image)} alt={product.name} style={{ width:"72px", height:"72px", borderRadius:"12px", objectFit:"cover", flexShrink:0, filter:outOfStock?"grayscale(60%)":"none" }} />
-                  : <div style={{ width:"72px", height:"72px", borderRadius:"12px", backgroundColor:outOfStock?"#e5e7eb":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:"24px" }}>📦</div>
-                }
+                {/* Product image */}
+                <div style={{ position:"relative", flexShrink:0 }}>
+                  {getImageUrl(product.image)
+                    ? <img src={getImageUrl(product.image)} alt={product.name}
+                        style={{ width:"72px", height:"72px", borderRadius:"12px", objectFit:"cover", filter:outOfStock?"grayscale(60%)":"none" }}
+                        onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+                      />
+                    : null
+                  }
+                  {/* Fallback box — hidden if image loads */}
+                  <div style={{ width:"72px", height:"72px", borderRadius:"12px", backgroundColor:outOfStock?"#e5e7eb":"#f0f0f0", display: getImageUrl(product.image) ? "none" : "flex", alignItems:"center", justifyContent:"center", fontSize:"24px" }}>📦</div>
+                </div>
+
                 <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ fontSize:"15px", fontWeight:"600", color:outOfStock?"#9ca3af":"#1a1a2e", margin:"0 0 4px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{product.name}</p>
+                  {/* Name row with star button */}
+                  <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"4px" }}>
+                    <p style={{ fontSize:"15px", fontWeight:"600", color:outOfStock?"#9ca3af":"#1a1a2e", margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>{product.name}</p>
+                    {/* ⭐ STAR BUTTON */}
+                    <button
+                      className="star-btn"
+                      onClick={e => toggleEssential(e, product)}
+                      title={essential ? "Remove from essential" : "Mark as essential"}
+                    >
+                      {essential
+                        ? <span style={{ fontSize:"18px" }}>⭐</span>
+                        : <span style={{ fontSize:"18px", opacity:0.3 }}>☆</span>
+                      }
+                    </button>
+                  </div>
+
                   <span style={{ display:"inline-block", backgroundColor:outOfStock?"#f3f4f6":"#f0fdf4", color:outOfStock?"#9ca3af":"#16a34a", fontSize:"11px", fontWeight:"500", padding:"2px 8px", borderRadius:"20px", marginBottom:"6px" }}>{product.category}</span>
+
                   <p style={{ fontSize:"12px", color:"#9ca3af", margin:0 }}>Cost: ₱{parseFloat(product.cost).toFixed(2)}{isBulk && product.pcsPerUnit ? ` / ${product.unit} (${product.pcsPerUnit} pcs)` : ""}</p>
                   {missingPcs && <p style={{ fontSize:"11px", color:"#ef4444", fontWeight:"600", margin:"3px 0 0" }}>⚠ Edit &amp; re-save to fix price</p>}
                   {historyCount > 0 && (
@@ -367,7 +460,7 @@ export default function Products() {
                 </div>
 
                 {/* Stock badge */}
-                <div style={{ position:"absolute", top:"14px", right:"14px", backgroundColor:stockPcs===0?"#fee2e2":stockPcs<=10?"#fef3c7":"#ecfdf5", color:stockPcs===0?"#ef4444":stockPcs<=10?"#d97706":"#059669", fontSize:"11px", fontWeight:"700", padding:"3px 8px", borderRadius:"20px", textAlign:"right", maxWidth:"120px" }}>
+                <div style={{ position:"absolute", top:"14px", right:"14px", backgroundColor:stockPcs===0?"#fee2e2":isLow?"#fef3c7":"#ecfdf5", color:stockPcs===0?"#ef4444":isLow?"#d97706":"#059669", fontSize:"11px", fontWeight:"700", padding:"3px 8px", borderRadius:"20px", textAlign:"right", maxWidth:"120px" }}>
                   {outOfStock ? "No Stock" : stockLabel}
                 </div>
 
@@ -376,7 +469,16 @@ export default function Products() {
                     ₱{sp}<span style={{ fontSize:"10px", display:"block", color:"#fb923c" }}>/pc</span>
                   </div>
                 )}
-                {outOfStock && <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fee2e2", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#ef4444" }}>OUT OF STOCK · Restock needed</div>}
+
+                {/* Essential + out-of-stock warning */}
+                {outOfStock && essential && (
+                  <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fef08a", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#a16207" }}>
+                    ⭐ ESSENTIAL · RESTOCK AGAD!
+                  </div>
+                )}
+                {outOfStock && !essential && (
+                  <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fee2e2", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#ef4444" }}>OUT OF STOCK · Restock needed</div>
+                )}
               </div>
             );
           })}
@@ -387,8 +489,12 @@ export default function Products() {
 
         {/* Context Menu */}
         {contextMenu && (
-          <div ref={contextRef} style={{ position:"fixed", backgroundColor:"#fff", borderRadius:"14px", boxShadow:"0 8px 30px rgba(0,0,0,0.15)", padding:"8px", zIndex:300, minWidth:"160px", left:Math.min(contextMenu.x, window.innerWidth-180), top:Math.min(contextMenu.y, window.innerHeight-120) }}>
+          <div ref={contextRef} style={{ position:"fixed", backgroundColor:"#fff", borderRadius:"14px", boxShadow:"0 8px 30px rgba(0,0,0,0.15)", padding:"8px", zIndex:300, minWidth:"170px", left:Math.min(contextMenu.x, window.innerWidth-190), top:Math.min(contextMenu.y, window.innerHeight-160) }}>
             <button style={{ display:"block", width:"100%", padding:"10px 14px", border:"none", background:"none", textAlign:"left", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", fontWeight:"500", color:"#1a1a2e", borderRadius:"8px", cursor:"pointer" }} onClick={() => openEdit(contextMenu.product)}>✏️ Edit</button>
+            <button style={{ display:"block", width:"100%", padding:"10px 14px", border:"none", background:"none", textAlign:"left", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", fontWeight:"500", color:"#a16207", borderRadius:"8px", cursor:"pointer" }}
+              onClick={e => { toggleEssential(e, contextMenu.product); setContextMenu(null); }}>
+              {contextMenu.product.isEssential ? "☆ Remove Essential" : "⭐ Mark as Essential"}
+            </button>
             <button style={{ display:"block", width:"100%", padding:"10px 14px", border:"none", background:"none", textAlign:"left", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", fontWeight:"500", color:"#2563eb", borderRadius:"8px", cursor:"pointer" }} onClick={() => { setHistoryProduct(contextMenu.product); setContextMenu(null); }}>📈 Price History</button>
             <button style={{ display:"block", width:"100%", padding:"10px 14px", border:"none", background:"none", textAlign:"left", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", fontWeight:"500", color:"#ef4444", borderRadius:"8px", cursor:"pointer" }} onClick={() => { setDeleteTarget(contextMenu.product._id); setContextMenu(null); }}>🗑️ Delete</button>
           </div>
@@ -419,15 +525,28 @@ export default function Products() {
               </div>
 
               <form id="pform" onSubmit={handleSubmit}>
-                {/* Image */}
+                {/* Image — supports both URL and file upload */}
                 <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"18px" }}>
                   <div onClick={() => fileInputRef.current.click()} style={{ width:"70px", height:"70px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
-                    {imagePreview ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>}
+                    {imagePreview
+                      ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+                          onError={e => { e.target.style.display="none"; }}
+                        />
+                      : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    }
                   </div>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:"14px", fontWeight:"600", color:"#374151", marginBottom:"4px" }}>Image URL</div>
-                    <input type="text" name="image" placeholder="https://..." style={{ ...inp, fontSize:"12px", color:"#9ca3af" }} value={form.image} onChange={handleChange} />
-                    <div style={{ fontSize:"11px", color:"#9ca3af", marginTop:"4px" }}>or tap box to upload</div>
+                    <div style={{ fontSize:"14px", fontWeight:"600", color:"#374151", marginBottom:"4px" }}>Image</div>
+                    {/* ── URL input — now triggers preview ── */}
+                    <input
+                      type="text"
+                      name="image"
+                      placeholder="I-paste ang image URL dito (https://...)"
+                      style={{ ...inp, fontSize:"12px", color:"#374151", marginBottom:"6px" }}
+                      value={form.image}
+                      onChange={handleImageUrlChange}
+                    />
+                    <div style={{ fontSize:"11px", color:"#9ca3af" }}>o i-tap ang kahon para mag-upload ng file</div>
                   </div>
                   <input ref={fileInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleImageChange} />
                 </div>

@@ -21,12 +21,12 @@ const productSchema = new mongoose.Schema({
   expiry:       Date,
   supplier:     String,
   image:        String,
+  isEssential:  { type: Boolean, default: false }, // ⭐ starred = kailangan laging may stock
   priceHistory: { type: [priceHistorySchema], default: [] },
   createdAt:    { type: Date, default: Date.now },
   updatedAt:    { type: Date, default: Date.now },
 });
 
-// Case-insensitive unique index on name
 productSchema.index({ name: 1 }, {
   unique: true,
   collation: { locale: "en", strength: 2 },
