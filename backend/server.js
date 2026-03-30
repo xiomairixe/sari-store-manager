@@ -102,7 +102,7 @@ import Sale from "./models/sale.js";
 import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
 import Asset from "./models/asset.js";
-import Note from "./models/Note.js";
+import Note from "./models/note.js";
 
 // ── HEALTH CHECK ──
 app.get("/health", (req, res) => {
