@@ -25,7 +25,7 @@ app.use(cors({
     process.env.FRONTEND_URL,
   ].filter(Boolean),
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express.json());
@@ -102,6 +102,7 @@ import Sale from "./models/sale.js";
 import Cost from "./models/cost.js";
 import Utang from "./models/utang.js";
 import Asset from "./models/asset.js";
+import Note from "./models/Note.js";
 
 // ── HEALTH CHECK ──
 app.get("/health", (req, res) => {
@@ -112,7 +113,10 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ── PRODUCTS ──
+// ════════════════════════════════════════════════════════════════════════════
+// PRODUCTS
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/products", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
@@ -133,7 +137,6 @@ app.post("/products", upload.single("image"), async (req, res) => {
     const data = parseProductFields(req.body);
     if (req.file) data.image = req.file.path;
 
-    // Frontend always sends stockInPacks="true" for bulk units (stock entered as packs)
     const isBulk = BULK_UNITS.includes(data.unit);
     if (isBulk && data.pcsPerUnit && data.pcsPerUnit > 0 && data.stockInPacks === "true") {
       data.stock = (data.stock || 0) * data.pcsPerUnit;
@@ -147,13 +150,12 @@ app.post("/products", upload.single("image"), async (req, res) => {
       data.pcsPerUnit
     );
 
-    // Record initial price in history
     data.priceHistory = [{
-      cost: data.cost || 0,
-      markup: data.markup || 0,
+      cost:         data.cost || 0,
+      markup:       data.markup || 0,
       sellingPrice: data.sellingPrice,
-      changedAt: new Date(),
-      note: "Initial price",
+      changedAt:    new Date(),
+      note:         "Initial price",
     }];
 
     const product = new Product(data);
@@ -173,7 +175,9 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
 
     if (req.file) {
       const old = await Product.findById(req.params.id);
-      if (old?.image) await deleteCloudinaryImage(old.image);
+      if (old?.image && old.image.includes("cloudinary.com")) {
+        await deleteCloudinaryImage(old.image);
+      }
       data.image = req.file.path;
     }
 
@@ -192,7 +196,6 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
     data.sellingPrice = newSellingPrice;
     data.updatedAt = new Date();
 
-    // Check if cost or markup changed → push to price history
     const existing = await Product.findById(req.params.id);
     if (existing) {
       const costChanged   = existing.cost         !== data.cost;
@@ -206,18 +209,21 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
             markup:       data.markup,
             sellingPrice: newSellingPrice,
             changedAt:    new Date(),
-            note:         `Cost: ₱${existing.cost}→₱${data.cost}, SP: ₱${existing.sellingPrice}→₱${newSellingPrice}`,
+            note: `Cost: ₱${existing.cost}→₱${data.cost}, SP: ₱${existing.sellingPrice}→₱${newSellingPrice}`,
           },
         };
       }
     }
 
-    // Separate $push from the flat update fields
     const { $push, ...flatData } = data;
     const updatePayload = { ...flatData };
     if ($push) updatePayload.$push = $push;
 
-    const updated = await Product.findByIdAndUpdate(req.params.id, updatePayload, { new: true, runValidators: true });
+    const updated = await Product.findByIdAndUpdate(
+      req.params.id,
+      updatePayload,
+      { new: true, runValidators: true }
+    );
     res.json(updated);
   } catch (err) {
     if (isDuplicateKeyError(err)) {
@@ -227,18 +233,32 @@ app.put("/products/:id", upload.single("image"), async (req, res) => {
   }
 });
 
-
+app.patch("/products/:id/essential", async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: "Not found" });
+    product.isEssential = !product.isEssential;
+    product.updatedAt = new Date();
+    await product.save();
+    res.json(product);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-    if (product?.image) await deleteCloudinaryImage(product.image);
+    if (product?.image && product.image.includes("cloudinary.com")) {
+      await deleteCloudinaryImage(product.image);
+    }
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: "Product deleted" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── SALES ──
+// ════════════════════════════════════════════════════════════════════════════
+// SALES
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/sales", async (req, res) => {
   try {
     const sales = await Sale.find().sort({ saleDate: -1 });
@@ -248,26 +268,38 @@ app.get("/sales", async (req, res) => {
 
 app.post("/sales", async (req, res) => {
   try {
-    const { productId, qty, unitPrice, productName, saleDate } = req.body;
-    const total = parseFloat(qty) * parseFloat(unitPrice);
+    const { productId, qty, unitPrice, productName, saleDate, notes, isDailySummary } = req.body;
+
     const sale = new Sale({
-      productId, productName, qty, unitPrice, total,
-      saleDate: saleDate || new Date(),
+      productId:      productId || null,
+      productName:    productName || "Manual Entry",
+      qty:            parseFloat(qty) || 1,
+      unitPrice:      parseFloat(unitPrice) || 0,
+      // total is computed by the pre-save hook: qty × unitPrice
+      saleDate:       saleDate || new Date(),
+      notes:          notes || "",
+      isDailySummary: isDailySummary || false,
     });
+
     await sale.save();
 
-    if (productId) {
+    // Deduct stock only for real product sales (not manual/daily summaries)
+    if (productId && productId !== "null") {
       const product = await Product.findById(productId);
       if (product) {
-        product.stock = Math.max(0, product.stock - parseInt(qty));
+        product.stock = Math.max(0, product.stock - (parseInt(qty) || 1));
         await product.save();
       }
     }
+
     res.status(201).json(sale);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── DAILY CONFIRMED ──
+// ════════════════════════════════════════════════════════════════════════════
+// DAILY CONFIRMED SALES
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/sales/confirmed", async (req, res) => {
   try {
     const records = await DailyConfirmed.find();
@@ -289,7 +321,10 @@ app.put("/sales/confirmed/:date", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── COSTS ──
+// ════════════════════════════════════════════════════════════════════════════
+// COSTS
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/costs", async (req, res) => {
   try {
     const costs = await Cost.find().sort({ costDate: -1 });
@@ -312,7 +347,10 @@ app.delete("/costs/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── UTANG ──
+// ════════════════════════════════════════════════════════════════════════════
+// UTANG (Customer Credit)
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/utang/customers", async (req, res) => {
   try {
     const customers = await Utang.find().sort({ customerName: 1 });
@@ -327,14 +365,13 @@ app.post("/utang/customers", async (req, res) => {
       phone:        req.body.phone || "",
       creditLimit:  req.body.creditLimit || 1000,
       amount: 0, amountPaid: 0, balance: 0, status: "unpaid",
-      transactions: [],   // ← bago
+      transactions: [],
     });
     await customer.save();
     res.status(201).json(customer);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NAG-PUSH NA NG TRANSACTION + NOTES
 app.post("/utang/customers/:id/add", async (req, res) => {
   try {
     const { amount, notes } = req.body;
@@ -346,8 +383,6 @@ app.post("/utang/customers/:id/add", async (req, res) => {
     customer.status   = customer.balance <= 0 ? "paid"
                       : customer.amountPaid > 0 ? "partial"
                       : "unpaid";
-
-    // ← ITO ANG KULANG SA DATI MONG SERVER
     customer.transactions.push({
       type:      "utang",
       amount:    parseFloat(amount),
@@ -360,7 +395,6 @@ app.post("/utang/customers/:id/add", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NAG-PUSH NA RIN NG TRANSACTION SA PAYMENT
 app.put("/utang/customers/:id/pay", async (req, res) => {
   try {
     const { amountPaid, notes } = req.body;
@@ -372,8 +406,6 @@ app.put("/utang/customers/:id/pay", async (req, res) => {
     customer.status      = customer.balance <= 0 ? "paid"
                          : customer.amountPaid > 0 ? "partial"
                          : "unpaid";
-
-    // ← ITO RIN ANG KULANG
     customer.transactions.push({
       type:      "payment",
       amount:    parseFloat(amountPaid),
@@ -393,7 +425,10 @@ app.delete("/utang/customers/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── ASSETS ──
+// ════════════════════════════════════════════════════════════════════════════
+// ASSETS
+// ════════════════════════════════════════════════════════════════════════════
+
 app.get("/api/assets", async (req, res) => {
   try {
     const assets = await Asset.find().sort({ createdAt: -1 });
@@ -411,7 +446,11 @@ app.post("/api/assets", async (req, res) => {
 
 app.put("/api/assets/:id", async (req, res) => {
   try {
-    const updated = await Asset.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const updated = await Asset.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
     if (!updated) return res.status(404).json({ error: "Asset not found" });
     res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -424,7 +463,48 @@ app.delete("/api/assets/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── START SERVER ──
+// ════════════════════════════════════════════════════════════════════════════
+// NOTES
+// ════════════════════════════════════════════════════════════════════════════
+
+app.get("/notes", async (req, res) => {
+  try {
+    const notes = await Note.find().sort({ updatedAt: -1 });
+    res.json(notes);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/notes", async (req, res) => {
+  try {
+    const note = new Note(req.body);
+    await note.save();
+    res.status(201).json(note);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/notes/:id", async (req, res) => {
+  try {
+    const updated = await Note.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(404).json({ error: "Note not found" });
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/notes/:id", async (req, res) => {
+  try {
+    await Note.findByIdAndDelete(req.params.id);
+    res.json({ message: "Note deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// START SERVER
+// ════════════════════════════════════════════════════════════════════════════
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 

@@ -53,6 +53,14 @@ const TABS = ["Daily", "Weekly", "Range"];
 const formatDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 const formatTime = (d) => new Date(d).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true });
 
+// ── Safe total getter — always uses qty × unitPrice as fallback ──
+const getSaleTotal = (s) => {
+  const total = parseFloat(s.total);
+  if (!isNaN(total) && total > 0) return total;
+  // Fallback: recompute from qty × unitPrice
+  return (parseFloat(s.qty) || 1) * (parseFloat(s.unitPrice) || 0);
+};
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -145,13 +153,12 @@ export default function Sales() {
   };
 
   const handleConfirm = async (date, val) => {
-    // Optimistic update
     setConfirmedState(prev => ({ ...prev, [date]: val }));
     try {
       await axios.put(`${BASE_URL}/sales/confirmed/${date}`, { confirmedAmount: val });
     } catch (err) {
       console.error(err);
-      fetchConfirmed(); // revert on failure
+      fetchConfirmed();
     }
   };
 
@@ -160,7 +167,15 @@ export default function Sales() {
     if (!form.amount || parseFloat(form.amount) <= 0) return;
     setSubmitting(true);
     try {
-      await axios.post(`${BASE_URL}/sales`, { productId: null, productName: form.notes || "Daily sales summary", qty: 1, unitPrice: parseFloat(form.amount), saleDate: form.date, notes: form.notes, isDailySummary: true });
+      await axios.post(`${BASE_URL}/sales`, {
+        productId: null,
+        productName: form.notes || "Daily sales summary",
+        qty: 1,
+        unitPrice: parseFloat(form.amount),
+        saleDate: form.date,
+        notes: form.notes,
+        isDailySummary: true,
+      });
       setShowModal(false);
       setForm({ date: new Date().toISOString().split("T")[0], amount: "", notes: "" });
       fetchSales();
@@ -182,7 +197,9 @@ export default function Sales() {
   };
 
   const filtered = getFilteredSales();
-  const total = filtered.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+
+  // ── Use getSaleTotal everywhere for consistent computation ──
+  const total = filtered.reduce((sum, s) => sum + getSaleTotal(s), 0);
 
   const rangeDays = (() => {
     const diff = new Date(dateRange.to) - new Date(dateRange.from);
@@ -196,7 +213,7 @@ export default function Sales() {
     from: prevRangeStart.toISOString().split("T")[0],
     to: prevRangeEnd.toISOString().split("T")[0],
   });
-  const prevTotal = prevRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const prevTotal = prevRangeSales.reduce((sum, s) => sum + getSaleTotal(s), 0);
   const changePct = prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(0) : null;
 
   const chartData = (() => {
@@ -212,7 +229,7 @@ export default function Sales() {
     }
     filtered.forEach((s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
-      if (map[key]) map[key].total += parseFloat(s.total || s.unitPrice || 0);
+      if (map[key]) map[key].total += getSaleTotal(s);
     });
     return Object.values(map);
   })();
@@ -223,7 +240,7 @@ export default function Sales() {
     filtered.reduce((acc, s) => {
       const key = new Date(s.saleDate).toISOString().split("T")[0];
       if (!acc[key]) acc[key] = { date: key, systemTotal: 0, count: 0 };
-      acc[key].systemTotal += parseFloat(s.total || s.unitPrice || 0);
+      acc[key].systemTotal += getSaleTotal(s);
       acc[key].count += 1;
       return acc;
     }, {})
@@ -232,7 +249,7 @@ export default function Sales() {
   const reviewSales = reviewDate
     ? sales.filter(s => new Date(s.saleDate).toISOString().split("T")[0] === reviewDate).sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
     : [];
-  const reviewTotal = reviewSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const reviewTotal = reviewSales.reduce((sum, s) => sum + getSaleTotal(s), 0);
   const getTxnType = (s) => (s.productId && s.productId !== "null" ? "checkout" : "manual");
 
   const confirmedCount = recentByDate.filter(r => confirmed[r.date] != null).length;
@@ -380,7 +397,7 @@ export default function Sales() {
                     const type = getTxnType(s);
                     const qty = parseInt(s.qty) || 1;
                     const unitPrice = parseFloat(s.unitPrice) || 0;
-                    const txnTotal = parseFloat(s.total || unitPrice * qty);
+                    const txnTotal = getSaleTotal(s);
                     return (
                       <div key={s._id || s.id} style={S.txnItem}>
                         <div style={S.txnLeft}>
