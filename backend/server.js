@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -275,7 +274,6 @@ app.post("/sales", async (req, res) => {
       productName:    productName || "Manual Entry",
       qty:            parseFloat(qty) || 1,
       unitPrice:      parseFloat(unitPrice) || 0,
-      // total is computed by the pre-save hook: qty × unitPrice
       saleDate:       saleDate || new Date(),
       notes:          notes || "",
       isDailySummary: isDailySummary || false,
@@ -283,7 +281,6 @@ app.post("/sales", async (req, res) => {
 
     await sale.save();
 
-    // Deduct stock only for real product sales (not manual/daily summaries)
     if (productId && productId !== "null") {
       const product = await Product.findById(productId);
       if (product) {
@@ -332,9 +329,11 @@ app.get("/costs", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/costs", async (req, res) => {
+app.post("/costs", upload.single("receipt"), async (req, res) => {
   try {
-    const cost = new Cost(req.body);
+    const data = { ...req.body };
+    if (req.file) data.receipt = req.file.path;
+    const cost = new Cost(data);
     await cost.save();
     res.status(201).json(cost);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -342,6 +341,8 @@ app.post("/costs", async (req, res) => {
 
 app.delete("/costs/:id", async (req, res) => {
   try {
+    const cost = await Cost.findById(req.params.id);
+    if (cost?.receipt) await deleteCloudinaryImage(cost.receipt);
     await Cost.findByIdAndDelete(req.params.id);
     res.json({ message: "Cost deleted" });
   } catch (err) { res.status(500).json({ error: err.message }); }

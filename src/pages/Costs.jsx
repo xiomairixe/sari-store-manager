@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./MonthFilter";
@@ -66,16 +66,25 @@ const CustomTooltip = ({ active, payload }) => {
   return null;
 };
 
-const emptyForm = { description: "", amount: "", category: "Rent", costDate: new Date().toISOString().split("T")[0] };
+const emptyForm = {
+  description: "",
+  amount: "",
+  category: "Rent",
+  costDate: new Date().toISOString().split("T")[0],
+};
 
 export default function Costs() {
   const [costs, setCosts] = useState([]);
   const [sales, setSales] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+  const [viewReceipt, setViewReceipt] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [dateRange, setDateRange] = useState(getDefaultDateRange());
+  const receiptInputRef = useRef();
 
   useEffect(() => { fetchCosts(); fetchSales(); }, []);
 
@@ -86,14 +95,28 @@ export default function Costs() {
     try { const res = await axios.get(`${BASE_URL}/sales`); setSales(res.data); } catch (err) { console.error(err); }
   };
 
+  const openModal = () => {
+    setForm(emptyForm);
+    setReceiptFile(null);
+    setReceiptPreview(null);
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.description || !form.amount) return;
     setSubmitting(true);
     try {
-      await axios.post(`${BASE_URL}/costs`, form);
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      if (receiptFile) fd.append("receipt", receiptFile);
+      await axios.post(`${BASE_URL}/costs`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       setShowModal(false);
       setForm(emptyForm);
+      setReceiptFile(null);
+      setReceiptPreview(null);
       fetchCosts();
     } catch (err) { console.error(err); } finally { setSubmitting(false); }
   };
@@ -108,7 +131,7 @@ export default function Costs() {
   const thisRangeSales = filterByDateRange(sales, "saleDate", dateRange);
   const thisRangeCosts = filterByDateRange(costs, "costDate", dateRange);
 
-  const revenue = thisRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
+  const revenue  = thisRangeSales.reduce((sum, s) => sum + parseFloat(s.total || s.unitPrice || 0), 0);
   const expenses = thisRangeCosts.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
   const netProfit = revenue - expenses;
 
@@ -127,6 +150,8 @@ export default function Costs() {
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={S.page}>
+
+        {/* Header */}
         <div style={S.header}>
           <div style={S.headerRow}>
             <h1 style={S.title}>Expenses & Profit</h1>
@@ -135,6 +160,7 @@ export default function Costs() {
         </div>
 
         <div style={S.body}>
+
           {/* Financial Summary */}
           <div style={S.card}>
             <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "6px" }}>
@@ -208,6 +234,16 @@ export default function Costs() {
                       </div>
                       <div style={S.expenseDate}>{formatDate(cost.costDate)}</div>
                     </div>
+                    {/* Receipt thumbnail */}
+                    {cost.receipt && (
+                      <img
+                        src={cost.receipt}
+                        alt="receipt"
+                        onClick={() => setViewReceipt(cost.receipt)}
+                        style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover",
+                          cursor: "pointer", flexShrink: 0, border: "1.5px solid #e5e7eb" }}
+                      />
+                    )}
                     <button style={S.deleteBtn} onClick={() => setDeleteTarget(cost._id || cost.id)}>🗑</button>
                   </div>
                 );
@@ -216,12 +252,33 @@ export default function Costs() {
           </div>
         </div>
 
-        <button style={S.fab} onClick={() => setShowModal(true)}>+</button>
+        {/* FAB */}
+        <button style={S.fab} onClick={openModal}>+</button>
+
+        {/* Receipt Full-Screen Viewer */}
+        {viewReceipt && (
+          <div
+            onClick={() => setViewReceipt(null)}
+            style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.88)", zIndex: 500,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+          >
+            <button
+              onClick={() => setViewReceipt(null)}
+              style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.15)",
+                border: "none", color: "#fff", fontSize: "22px", borderRadius: "50%",
+                width: "40px", height: "40px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >✕</button>
+            <img src={viewReceipt} alt="receipt full"
+              style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: "12px", objectFit: "contain" }} />
+          </div>
+        )}
 
         {/* Delete Confirm */}
         {deleteTarget && (
-          <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-            <div style={{ backgroundColor: "#fff", borderRadius: "20px", padding: "28px 20px", width: "100%", maxWidth: "320px", textAlign: "center", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
+          <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 400,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+            <div style={{ backgroundColor: "#fff", borderRadius: "20px", padding: "28px 20px", width: "100%",
+              maxWidth: "320px", textAlign: "center", boxShadow: "0 8px 40px rgba(0,0,0,0.2)" }}>
               <div style={{ fontSize: "44px", marginBottom: "12px" }}>🗑️</div>
               <div style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a2e", marginBottom: "8px" }}>Delete Expense?</div>
               <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "24px" }}>This action cannot be undone.</div>
@@ -243,22 +300,75 @@ export default function Costs() {
                   <button style={S.closeBtn} onClick={() => setShowModal(false)}>✕</button>
                 </div>
                 <form id="expense-form" onSubmit={handleSubmit}>
+
                   <label style={S.label}>Description</label>
-                  <input style={S.input} placeholder="e.g. Meralco Bill" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                  <input style={S.input} placeholder="e.g. Meralco Bill" value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })} />
+
                   <div style={S.row2}>
                     <div>
                       <label style={S.label}>Amount</label>
-                      <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                      <input style={S.input} type="number" step="0.01" placeholder="0.00" value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                     </div>
                     <div>
                       <label style={S.label}>Category</label>
-                      <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                      <select style={S.input} value={form.category}
+                        onChange={(e) => setForm({ ...form, category: e.target.value })}>
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
+
                   <label style={S.label}>Date</label>
-                  <input style={{ ...S.input, marginBottom: "4px" }} type="date" value={form.costDate} onChange={(e) => setForm({ ...form, costDate: e.target.value })} />
+                  <input style={{ ...S.input, marginBottom: "14px" }} type="date" value={form.costDate}
+                    onChange={(e) => setForm({ ...form, costDate: e.target.value })} />
+
+                  {/* Receipt Upload */}
+                  <label style={S.label}>
+                    Receipt{" "}
+                    <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "12px" }}>(optional)</span>
+                  </label>
+                  <div
+                    onClick={() => receiptInputRef.current.click()}
+                    style={{
+                      border: "2px dashed #e5e7eb", borderRadius: "12px", padding: "14px",
+                      display: "flex", alignItems: "center", gap: "12px", cursor: "pointer",
+                      backgroundColor: receiptPreview ? "#f0fdf4" : "#fafafa", marginBottom: "14px",
+                    }}
+                  >
+                    {receiptPreview ? (
+                      <img src={receiptPreview} alt="receipt preview"
+                        style={{ width: "56px", height: "56px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: "56px", height: "56px", borderRadius: "8px", backgroundColor: "#f3f4f6",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>🧾</div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>
+                        {receiptFile ? receiptFile.name : "Tap to upload receipt"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>JPG, PNG, WEBP · max 5MB</div>
+                    </div>
+                    {receiptPreview && (
+                      <button type="button"
+                        onClick={e => { e.stopPropagation(); setReceiptFile(null); setReceiptPreview(null); }}
+                        style={{ background: "none", border: "none", fontSize: "18px", color: "#9ca3af", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                    )}
+                  </div>
+                  <input
+                    ref={receiptInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      setReceiptFile(file);
+                      setReceiptPreview(URL.createObjectURL(file));
+                    }}
+                  />
+
                 </form>
               </div>
               <div style={S.submitBtnWrap}>
@@ -269,6 +379,7 @@ export default function Costs() {
             </div>
           </div>
         )}
+
       </div>
     </>
   );
