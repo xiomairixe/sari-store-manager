@@ -16,41 +16,71 @@ function App() {
 
   return (
     <Router>
-      <Navbar />
+      <style>{`
+        /* ── App-level layout ── */
+        .app-shell {
+          display: flex;
+          min-height: 100vh;
+        }
+        .app-content {
+          flex: 1;
+          min-width: 0;
+        }
 
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/sales" element={<Sales />} />
-        <Route path="/costs" element={<Costs />} />
-        <Route path="/utang" element={<Utang />} />
-        <Route path="/Assets" element={<Assets />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/suppliers" element={<Suppliers />} />
-      </Routes>
+        /* ── Notes button: above bottom nav on mobile, fixed left on desktop ── */
+        .notes-fab {
+          position: fixed;
+          bottom: 88px;
+          left: 20px;
+          width: 46px;
+          height: 46px;
+          border-radius: 50%;
+          background-color: #1a1a2e;
+          border: none;
+          color: #fff;
+          font-size: 20px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+          z-index: 999;
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .notes-fab:hover {
+          transform: scale(1.08);
+          box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+        }
+        @media (min-width: 768px) {
+          .notes-fab {
+            /* On desktop, sidebar is 220px wide — tuck button just inside content area */
+            bottom: 32px;
+            left: 236px;
+          }
+        }
+      `}</style>
 
-      {/* ── Floating Notes Button (above navbar, left side) ── */}
+      <div className="app-shell">
+        <Navbar />
+
+        <div className="app-content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/costs" element={<Costs />} />
+            <Route path="/utang" element={<Utang />} />
+            <Route path="/Assets" element={<Assets />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+          </Routes>
+        </div>
+      </div>
+
+      {/* ── Floating Notes Button ── */}
       <button
+        className="notes-fab"
         onClick={() => setNotesOpen(true)}
-        style={{
-          position: "fixed",
-          bottom: "88px",
-          left: "20px",
-          width: "46px",
-          height: "46px",
-          borderRadius: "50%",
-          backgroundColor: "#1a1a2e",
-          border: "none",
-          color: "#fff",
-          fontSize: "20px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-          zIndex: 999,
-          transition: "transform 0.15s ease",
-        }}
         title="Shopping Notes"
       >
         🛒
@@ -72,6 +102,8 @@ function App() {
           <div
             style={{
               width: "100%",
+              maxWidth: "640px",       // cap width on desktop so it doesn't stretch full screen
+              margin: "0 auto",        // center it
               height: "92vh",
               borderRadius: "24px 24px 0 0",
               overflow: "hidden",

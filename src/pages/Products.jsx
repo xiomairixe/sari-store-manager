@@ -8,8 +8,8 @@ const API_URL = `${BASE_URL}/products`;
 
 const getImageUrl = (image) => {
   if (!image) return null;
-  if (image.startsWith("http")) return image;   // ← external URL, gamitin directly
-  return `${BASE_URL}/uploads/${image}`;         // ← uploaded file
+  if (image.startsWith("http")) return image;
+  return `${BASE_URL}/uploads/${image}`;
 };
 
 const CATEGORIES = [
@@ -54,10 +54,12 @@ function PriceHistoryModal({ product, onClose }) {
   const history = [...(product.priceHistory || [])].reverse();
   return (
     <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.5)", zIndex:500,
-      display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ backgroundColor:"#fff", borderRadius:"24px 24px 0 0", width:"100%",
-        maxHeight:"75vh", overflowY:"auto", padding:"24px 20px 40px", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ backgroundColor:"#fff", borderRadius:"20px", width:"100%",
+        maxWidth:"480px", maxHeight:"80vh", overflowY:"auto",
+        padding:"24px 20px 32px", fontFamily:"'DM Sans',sans-serif",
+        boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
           <div>
             <h2 style={{ fontSize:"18px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>Price History</h2>
@@ -108,7 +110,7 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [filterEssential, setFilterEssential] = useState(false); // ⭐ filter toggle
+  const [filterEssential, setFilterEssential] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -142,18 +144,12 @@ export default function Products() {
     catch (err) { console.error(err); }
   };
 
-  // ── Toggle star (essential) ──────────────────────────────────────────────
   const toggleEssential = async (e, product) => {
-    e.stopPropagation(); // don't trigger long-press or other handlers
+    e.stopPropagation();
     try {
       const res = await axios.patch(`${API_URL}/${product._id}/essential`);
-      // Optimistically update in local state
       setProducts(prev => prev.map(p => p._id === product._id ? res.data : p));
-      showToast(
-        res.data.isEssential
-          ? `⭐ "${product.name}" marked as essential`
-          : `"${product.name}" removed from essential`,
-      );
+      showToast(res.data.isEssential ? `⭐ "${product.name}" marked as essential` : `"${product.name}" removed from essential`);
     } catch { showToast("Failed to update.", "error"); }
   };
 
@@ -170,16 +166,11 @@ export default function Products() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // ── When user pastes a URL into the image field, show preview ──
   const handleImageUrlChange = (e) => {
     handleChange(e);
     const val = e.target.value.trim();
-    if (val.startsWith("http")) {
-      setImagePreview(val);
-      setImageFile(null); // clear any uploaded file
-    } else if (!val) {
-      setImagePreview(null);
-    }
+    if (val.startsWith("http")) { setImagePreview(val); setImageFile(null); }
+    else if (!val) setImagePreview(null);
   };
 
   const calcSellingPrice = () => {
@@ -196,11 +187,7 @@ export default function Products() {
   const profit = () => (parseFloat(totalRevenue()) - (parseFloat(form.cost) || 0)).toFixed(2);
 
   const openAdd = () => {
-    setForm(emptyForm);
-    setEditId(null);
-    setImagePreview(null);
-    setImageFile(null);
-    setShowModal(true);
+    setForm(emptyForm); setEditId(null); setImagePreview(null); setImageFile(null); setShowModal(true);
   };
 
   const openEdit = (product) => {
@@ -209,23 +196,17 @@ export default function Products() {
     const stockInForm = isBulkProduct && product.pcsPerUnit && parseFloat(product.pcsPerUnit) > 0
       ? Math.round(parseFloat(product.stock) / parseFloat(product.pcsPerUnit))
       : product.stock;
-
     setForm({
-      image: product.image || "",
-      name: product.name,
+      image: product.image || "", name: product.name,
       category: isCustom ? "Other" : product.category,
       customCategory: isCustom ? product.category : "",
-      unit: product.unit,
-      pcsPerUnit: product.pcsPerUnit || "",
-      cost: product.cost,
-      markup: product.markup,
-      stock: stockInForm,
-      reorder: product.reorder || 10,
+      unit: product.unit, pcsPerUnit: product.pcsPerUnit || "",
+      cost: product.cost, markup: product.markup,
+      stock: stockInForm, reorder: product.reorder || 10,
       expiry: product.expiry ? product.expiry.split("T")[0] : "",
       supplier: product.supplier || "",
     });
     setEditId(product._id);
-    // ── Show preview for both URL and uploaded images ──
     setImagePreview(getImageUrl(product.image) || null);
     setImageFile(null);
     setShowModal(true);
@@ -243,42 +224,26 @@ export default function Products() {
       if (form.category === "Other" && form.customCategory?.trim()) submitForm.category = form.customCategory.trim();
       delete submitForm.customCategory;
       submitForm.sellingPrice = calcSellingPrice();
-
       const fd = new FormData();
       if (isBulkUnit) fd.append("stockInPacks", "true");
-      Object.entries(submitForm).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) fd.append(k, v);
-      });
-      // ── Only append file if user uploaded one; otherwise the URL string is already in form.image ──
+      Object.entries(submitForm).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v); });
       if (imageFile) fd.append("image", imageFile);
-
       const headers = { "Content-Type": "multipart/form-data" };
-      if (editId) {
-        await axios.put(`${API_URL}/${editId}`, fd, { headers });
-        showToast(`"${form.name}" updated!`);
-      } else {
-        await axios.post(API_URL, fd, { headers });
-        showToast(`"${form.name}" added to inventory!`);
-      }
+      if (editId) { await axios.put(`${API_URL}/${editId}`, fd, { headers }); showToast(`"${form.name}" updated!`); }
+      else { await axios.post(API_URL, fd, { headers }); showToast(`"${form.name}" added to inventory!`); }
       setShowModal(false);
       fetchProducts();
     } catch (err) {
       console.error(err);
-      if (err.response?.status === 409 || err.response?.data?.error === "DUPLICATE") {
-        showToast(`"${form.name}" ay mayroon na sa inventory!`, "error");
-      } else {
-        showToast("Something went wrong. Try again.", "error");
-      }
+      if (err.response?.status === 409 || err.response?.data?.error === "DUPLICATE") showToast(`"${form.name}" ay mayroon na sa inventory!`, "error");
+      else showToast("Something went wrong. Try again.", "error");
     } finally { setSubmitting(false); }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    try {
-      await axios.delete(`${API_URL}/${deleteTarget}`);
-      showToast("Product deleted.");
-      fetchProducts();
-    } catch { showToast("Failed to delete.", "error"); }
+    try { await axios.delete(`${API_URL}/${deleteTarget}`); showToast("Product deleted."); fetchProducts(); }
+    catch { showToast("Failed to delete.", "error"); }
     finally { setDeleteTarget(null); }
   };
 
@@ -288,7 +253,6 @@ export default function Products() {
     setContextMenu({ x: touch.clientX, y: touch.clientY, product });
   };
 
-  // ── Filtering + sorting ──────────────────────────────────────────────────
   const filtered = products
     .filter(p =>
       p.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -296,7 +260,6 @@ export default function Products() {
       (!filterEssential || p.isEssential)
     )
     .sort((a, b) => {
-      // Essential products float to top, then out-of-stock sink to bottom
       if (a.isEssential !== b.isEssential) return a.isEssential ? -1 : 1;
       const aO = parseInt(a.stock) === 0;
       const bO = parseInt(b.stock) === 0;
@@ -310,21 +273,94 @@ export default function Products() {
   const inpHL = { ...inp, border:"1.5px solid #f97316", backgroundColor:"#fff8f0" };
   const lbl   = { fontSize:"13px", fontWeight:"600", color:"#374151", marginBottom:"6px", display:"block" };
 
-  const NAVBAR_H = 64;
-
   return (
     <>
       <style>{`
         @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+
+        .products-page {
+          background-color: #f5f6fa;
+          min-height: 100vh;
+          font-family: 'DM Sans', sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* ── Sticky header ── */
+        .products-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px 20px 10px;
+          background-color: #fff;
+          border-bottom: 1px solid #eeeff3;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          flex-shrink: 0;
+        }
+
+        /* ── Search + categories bar ── */
+        .products-toolbar {
+          background: #fff;
+          padding: 10px 20px 0;
+          position: sticky;
+          top: 65px;
+          z-index: 9;
+          flex-shrink: 0;
+        }
+
+        /* ── Product list ── */
+        .products-list {
+          padding: 14px 20px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          flex: 1;
+        }
+
+        /* ── FAB ── */
+        .products-fab {
+          position: fixed;
+          bottom: 85px;
+          right: 20px;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background-color: #f97316;
+          border: none;
+          color: #fff;
+          font-size: 26px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 16px rgba(249,115,22,0.4);
+          z-index: 100;
+        }
+
+        /* ── Modal overlay ── */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.45);
+          z-index: 200;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+
+        /* ── Modal sheet: bottom sheet on mobile, centered dialog on desktop ── */
         .modal-sheet {
           background: #fff;
           border-radius: 24px 24px 0 0;
           width: 100%;
-          max-height: calc(100vh - ${NAVBAR_H}px);
+          max-height: 92vh;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
           padding: 24px 20px 100px;
         }
+
         .star-btn {
           background: none;
           border: none;
@@ -334,57 +370,95 @@ export default function Products() {
           transition: transform 0.15s ease;
         }
         .star-btn:active { transform: scale(1.3); }
+
+        /* ── Desktop overrides ── */
+        @media (min-width: 768px) {
+          .products-header {
+            padding: 20px 32px 14px;
+            top: 0;
+          }
+          .products-toolbar {
+            padding: 10px 32px 0;
+            top: 69px;
+          }
+          .products-list {
+            padding: 16px 32px 40px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            align-items: start;
+          }
+          .products-fab {
+            bottom: 32px;
+            right: 32px;
+          }
+          /* Centered dialog on desktop */
+          .modal-overlay {
+            align-items: center;
+            padding: 24px;
+          }
+          .modal-sheet {
+            border-radius: 20px;
+            max-width: 580px;
+            max-height: 88vh;
+            padding: 28px 28px 40px;
+          }
+        }
+
+        @media (min-width: 1100px) {
+          .products-list {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
       `}</style>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <Toast toasts={toasts} />
 
       {historyProduct && <PriceHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />}
 
-      <div style={{ backgroundColor:"#f5f6fa", minHeight:"100vh", fontFamily:"'DM Sans',sans-serif", paddingBottom:"90px" }}>
+      <div className="products-page">
 
-        {/* Header */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 20px 10px", backgroundColor:"#f5f6fa", position:"sticky", top:0, zIndex:10 }}>
+        {/* ── Header ── */}
+        <div className="products-header">
           <div>
-            <h1 style={{ fontSize:"26px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>Inventory</h1>
+            <h1 style={{ fontSize:"22px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>Inventory</h1>
             <div style={{ display:"flex", gap:"10px", marginTop:"2px", flexWrap:"wrap" }}>
-              {outOfStockCount > 0 && (
-                <div style={{ fontSize:"12px", color:"#ef4444", fontWeight:"600" }}>⚠ {outOfStockCount} out of stock</div>
-              )}
-              {essentialLowCount > 0 && (
-                <div style={{ fontSize:"12px", color:"#d97706", fontWeight:"600" }}>⭐ {essentialLowCount} essential low</div>
-              )}
+              {outOfStockCount > 0 && <div style={{ fontSize:"12px", color:"#ef4444", fontWeight:"600" }}>⚠ {outOfStockCount} out of stock</div>}
+              {essentialLowCount > 0 && <div style={{ fontSize:"12px", color:"#d97706", fontWeight:"600" }}>⭐ {essentialLowCount} essential low</div>}
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            {/* Essential filter toggle */}
-            <button
-              onClick={() => setFilterEssential(f => !f)}
-              style={{ display:"flex", alignItems:"center", gap:"5px", backgroundColor: filterEssential ? "#fef9c3" : "#fff", border: `1.5px solid ${filterEssential ? "#eab308" : "#e5e7eb"}`, borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color: filterEssential ? "#a16207" : "#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+            <button onClick={() => setFilterEssential(f => !f)}
+              style={{ display:"flex", alignItems:"center", gap:"5px", backgroundColor:filterEssential?"#fef9c3":"#fff", border:`1.5px solid ${filterEssential?"#eab308":"#e5e7eb"}`, borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color:filterEssential?"#a16207":"#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
               ⭐ {filterEssential ? "Essential" : "All"}
             </button>
-            <button onClick={() => navigate("/suppliers")} style={{ display:"flex", alignItems:"center", gap:"6px", backgroundColor:"#fff", border:"1.5px solid #e5e7eb", borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color:"#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>🏪 Suppliers</button>
+            <button onClick={() => navigate("/suppliers")}
+              style={{ display:"flex", alignItems:"center", gap:"6px", backgroundColor:"#fff", border:"1.5px solid #e5e7eb", borderRadius:"20px", padding:"7px 14px", fontSize:"13px", fontWeight:"600", color:"#374151", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+              🏪 Suppliers
+            </button>
           </div>
         </div>
 
-        {/* Search */}
-        <div style={{ padding:"8px 20px" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:"10px", backgroundColor:"#eef0f5", borderRadius:"14px", padding:"10px 16px" }}>
+        {/* ── Search + Categories ── */}
+        <div className="products-toolbar">
+          <div style={{ display:"flex", alignItems:"center", gap:"10px", backgroundColor:"#eef0f5", borderRadius:"14px", padding:"10px 16px", marginBottom:"10px" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input style={{ border:"none", background:"transparent", outline:"none", fontSize:"14px", color:"#333", width:"100%", fontFamily:"'DM Sans',sans-serif" }} placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          <div style={{ display:"flex", gap:"8px", overflowX:"auto", paddingBottom:"10px", scrollbarWidth:"none" }}>
+            {CATEGORIES.map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                style={{ flexShrink:0, padding:"6px 16px", borderRadius:"20px", border:"1.5px solid", borderColor:activeCategory===cat?"#f97316":"#ddd", backgroundColor:activeCategory===cat?"#f97316":"#fff", color:activeCategory===cat?"#fff":"#666", fontSize:"13px", fontWeight:activeCategory===cat?"600":"400", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Categories */}
-        <div style={{ display:"flex", gap:"8px", overflowX:"auto", padding:"8px 20px", scrollbarWidth:"none" }}>
-          {CATEGORIES.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)} style={{ flexShrink:0, padding:"6px 16px", borderRadius:"20px", border:"1.5px solid", borderColor:activeCategory===cat?"#f97316":"#ddd", backgroundColor:activeCategory===cat?"#f97316":"#fff", color:activeCategory===cat?"#fff":"#666", fontSize:"13px", fontWeight:activeCategory===cat?"600":"400", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>{cat}</button>
-          ))}
-        </div>
-
-        {/* Product List */}
-        <div style={{ padding:"8px 20px", display:"flex", flexDirection:"column", gap:"12px" }}>
+        {/* ── Product List ── */}
+        <div className="products-list">
           {filtered.length === 0 ? (
-            <div style={{ textAlign:"center", color:"#9ca3af", padding:"40px 0", fontSize:"14px" }}>
+            <div style={{ textAlign:"center", color:"#9ca3af", padding:"40px 0", fontSize:"14px", gridColumn:"1/-1" }}>
               {filterEssential ? "Walang essential products pa. I-star ang mga important." : "No products found."}
             </div>
           ) : filtered.map(product => {
@@ -405,8 +479,7 @@ export default function Products() {
               <div key={product._id}
                 style={{
                   backgroundColor: outOfStock ? "#f9fafb" : "#fff",
-                  borderRadius:"16px",
-                  padding:"14px",
+                  borderRadius:"16px", padding:"14px",
                   display:"flex", gap:"14px", alignItems:"center",
                   boxShadow: outOfStock ? "none" : essential ? "0 0 0 2px #eab308, 0 1px 4px rgba(0,0,0,0.06)" : "0 1px 4px rgba(0,0,0,0.06)",
                   position:"relative", cursor:"pointer",
@@ -417,38 +490,26 @@ export default function Products() {
                 onTouchStart={e => { const t = setTimeout(() => handleLongPress(e, product), 500); e.currentTarget._t = t; }}
                 onTouchEnd={e => clearTimeout(e.currentTarget._t)}
               >
-                {/* Product image */}
+                {/* Image */}
                 <div style={{ position:"relative", flexShrink:0 }}>
                   {getImageUrl(product.image)
                     ? <img src={getImageUrl(product.image)} alt={product.name}
                         style={{ width:"72px", height:"72px", borderRadius:"12px", objectFit:"cover", filter:outOfStock?"grayscale(60%)":"none" }}
-                        onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+                        onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="flex"; }}
                       />
-                    : null
-                  }
-                  {/* Fallback box — hidden if image loads */}
-                  <div style={{ width:"72px", height:"72px", borderRadius:"12px", backgroundColor:outOfStock?"#e5e7eb":"#f0f0f0", display: getImageUrl(product.image) ? "none" : "flex", alignItems:"center", justifyContent:"center", fontSize:"24px" }}>📦</div>
+                    : null}
+                  <div style={{ width:"72px", height:"72px", borderRadius:"12px", backgroundColor:outOfStock?"#e5e7eb":"#f0f0f0", display:getImageUrl(product.image)?"none":"flex", alignItems:"center", justifyContent:"center", fontSize:"24px" }}>📦</div>
                 </div>
 
                 <div style={{ flex:1, minWidth:0 }}>
-                  {/* Name row with star button */}
                   <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"4px" }}>
                     <p style={{ fontSize:"15px", fontWeight:"600", color:outOfStock?"#9ca3af":"#1a1a2e", margin:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>{product.name}</p>
-                    {/* ⭐ STAR BUTTON */}
-                    <button
-                      className="star-btn"
-                      onClick={e => toggleEssential(e, product)}
-                      title={essential ? "Remove from essential" : "Mark as essential"}
-                    >
-                      {essential
-                        ? <span style={{ fontSize:"18px" }}>⭐</span>
-                        : <span style={{ fontSize:"18px", opacity:0.3 }}>☆</span>
-                      }
+                    <button className="star-btn" onClick={e => toggleEssential(e, product)} title={essential?"Remove from essential":"Mark as essential"}>
+                      {essential ? <span style={{ fontSize:"18px" }}>⭐</span> : <span style={{ fontSize:"18px", opacity:0.3 }}>☆</span>}
                     </button>
                   </div>
 
                   <span style={{ display:"inline-block", backgroundColor:outOfStock?"#f3f4f6":"#f0fdf4", color:outOfStock?"#9ca3af":"#16a34a", fontSize:"11px", fontWeight:"500", padding:"2px 8px", borderRadius:"20px", marginBottom:"6px" }}>{product.category}</span>
-
                   <p style={{ fontSize:"12px", color:"#9ca3af", margin:0 }}>Cost: ₱{parseFloat(product.cost).toFixed(2)}{isBulk && product.pcsPerUnit ? ` / ${product.unit} (${product.pcsPerUnit} pcs)` : ""}</p>
                   {missingPcs && <p style={{ fontSize:"11px", color:"#ef4444", fontWeight:"600", margin:"3px 0 0" }}>⚠ Edit &amp; re-save to fix price</p>}
                   {historyCount > 0 && (
@@ -460,7 +521,7 @@ export default function Products() {
                 </div>
 
                 {/* Stock badge */}
-                <div style={{ position:"absolute", top:"14px", right:"14px", backgroundColor:stockPcs===0?"#fee2e2":isLow?"#fef3c7":"#ecfdf5", color:stockPcs===0?"#ef4444":isLow?"#d97706":"#059669", fontSize:"11px", fontWeight:"700", padding:"3px 8px", borderRadius:"20px", textAlign:"right", maxWidth:"120px" }}>
+                <div style={{ position:"absolute", top:"14px", right:"14px", backgroundColor:stockPcs===0?"#fee2e2":isLow?"#fef3c7":"#ecfdf5", color:stockPcs===0?"#ef4444":isLow?"#d97706":"#059669", fontSize:"11px", fontWeight:"700", padding:"3px 8px", borderRadius:"20px", textAlign:"right", maxWidth:"130px" }}>
                   {outOfStock ? "No Stock" : stockLabel}
                 </div>
 
@@ -470,24 +531,25 @@ export default function Products() {
                   </div>
                 )}
 
-                {/* Essential + out-of-stock warning */}
                 {outOfStock && essential && (
                   <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fef08a", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#a16207" }}>
                     ⭐ ESSENTIAL · RESTOCK AGAD!
                   </div>
                 )}
                 {outOfStock && !essential && (
-                  <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fee2e2", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#ef4444" }}>OUT OF STOCK · Restock needed</div>
+                  <div style={{ position:"absolute", bottom:0, left:0, right:0, backgroundColor:"#fee2e2", borderRadius:"0 0 14px 14px", padding:"4px 0", textAlign:"center", fontSize:"11px", fontWeight:"700", color:"#ef4444" }}>
+                    OUT OF STOCK · Restock needed
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
 
-        {/* FAB */}
-        <button onClick={openAdd} style={{ position:"fixed", bottom:"85px", right:"20px", width:"52px", height:"52px", borderRadius:"50%", backgroundColor:"#f97316", border:"none", color:"#fff", fontSize:"26px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 16px rgba(249,115,22,0.4)", zIndex:100 }}>+</button>
+        {/* ── FAB ── */}
+        <button className="products-fab" onClick={openAdd}>+</button>
 
-        {/* Context Menu */}
+        {/* ── Context Menu ── */}
         {contextMenu && (
           <div ref={contextRef} style={{ position:"fixed", backgroundColor:"#fff", borderRadius:"14px", boxShadow:"0 8px 30px rgba(0,0,0,0.15)", padding:"8px", zIndex:300, minWidth:"170px", left:Math.min(contextMenu.x, window.innerWidth-190), top:Math.min(contextMenu.y, window.innerHeight-160) }}>
             <button style={{ display:"block", width:"100%", padding:"10px 14px", border:"none", background:"none", textAlign:"left", fontSize:"14px", fontFamily:"'DM Sans',sans-serif", fontWeight:"500", color:"#1a1a2e", borderRadius:"8px", cursor:"pointer" }} onClick={() => openEdit(contextMenu.product)}>✏️ Edit</button>
@@ -500,7 +562,7 @@ export default function Products() {
           </div>
         )}
 
-        {/* Delete Confirm */}
+        {/* ── Delete Confirm ── */}
         {deleteTarget && (
           <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.5)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }} onClick={e => e.target === e.currentTarget && setDeleteTarget(null)}>
             <div style={{ backgroundColor:"#fff", borderRadius:"20px", padding:"28px 20px", width:"100%", maxWidth:"320px", textAlign:"center", boxShadow:"0 8px 40px rgba(0,0,0,0.2)" }}>
@@ -515,9 +577,9 @@ export default function Products() {
           </div>
         )}
 
-        {/* Add/Edit Modal */}
+        {/* ── Add/Edit Modal ── */}
         {showModal && (
-          <div style={{ position:"fixed", inset:0, backgroundColor:"rgba(0,0,0,0.45)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
             <div className="modal-sheet">
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
                 <h2 style={{ fontSize:"20px", fontWeight:"700", color:"#1a1a2e", margin:0 }}>{editId ? "Edit Product" : "Add New Product"}</h2>
@@ -525,27 +587,19 @@ export default function Products() {
               </div>
 
               <form id="pform" onSubmit={handleSubmit}>
-                {/* Image — supports both URL and file upload */}
+                {/* Image */}
                 <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"18px" }}>
                   <div onClick={() => fileInputRef.current.click()} style={{ width:"70px", height:"70px", borderRadius:"12px", border:"2px dashed #ddd", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", cursor:"pointer", backgroundColor:"#fafafa", flexShrink:0 }}>
                     {imagePreview
-                      ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }}
-                          onError={e => { e.target.style.display="none"; }}
-                        />
+                      ? <img src={imagePreview} alt="preview" style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.target.style.display="none"; }} />
                       : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                     }
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:"14px", fontWeight:"600", color:"#374151", marginBottom:"4px" }}>Image</div>
-                    {/* ── URL input — now triggers preview ── */}
-                    <input
-                      type="text"
-                      name="image"
-                      placeholder="I-paste ang image URL dito (https://...)"
+                    <input type="text" name="image" placeholder="I-paste ang image URL dito (https://...)"
                       style={{ ...inp, fontSize:"12px", color:"#374151", marginBottom:"6px" }}
-                      value={form.image}
-                      onChange={handleImageUrlChange}
-                    />
+                      value={form.image} onChange={handleImageUrlChange} />
                     <div style={{ fontSize:"11px", color:"#9ca3af" }}>o i-tap ang kahon para mag-upload ng file</div>
                   </div>
                   <input ref={fileInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleImageChange} />
@@ -637,16 +691,17 @@ export default function Products() {
                 </div>
 
                 <div style={{ marginBottom:"14px" }}><label style={lbl}>Expiry Date</label><input style={inp} type="date" name="expiry" value={form.expiry} onChange={handleChange} /></div>
-                <div style={{ marginBottom:"8px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
+                <div style={{ marginBottom:"20px" }}><label style={lbl}>Supplier</label><input style={inp} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Supplier name" /></div>
 
                 <button type="submit" disabled={submitting}
-                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1, marginTop:"8px", marginBottom:"32px" }}>
+                  style={{ width:"100%", backgroundColor:submitting?"#fb923c":"#f97316", color:"#fff", border:"none", borderRadius:"14px", padding:"16px", fontSize:"16px", fontWeight:"700", cursor:submitting?"not-allowed":"pointer", fontFamily:"'DM Sans',sans-serif", opacity:submitting?0.8:1 }}>
                   {submitting ? "Saving..." : editId ? "✅ Update Product" : "✅ Add Product"}
                 </button>
               </form>
             </div>
           </div>
         )}
+
       </div>
     </>
   );

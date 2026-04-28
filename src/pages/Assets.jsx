@@ -3,7 +3,6 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// ── Categories & Status config ──────────────────────────────────────────────
 const CATEGORIES = [
   { key: "all",       label: "All"       },
   { key: "equipment", label: "Equipment" },
@@ -32,83 +31,9 @@ const EMPTY_FORM = {
   status: "active", description: "", quantity: "",
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt     = (v) => "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—";
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-const S = {
-  page:        { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
-  header:      { padding: "20px 20px 10px", backgroundColor: "#f5f6fa", position: "sticky", top: 0, zIndex: 10 },
-  headerRow:   { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  title:       { fontSize: "24px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-  body:        { padding: "0 16px", display: "flex", flexDirection: "column", gap: "14px" },
-
-  totalCard:   { background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", borderRadius: "18px", padding: "20px", color: "#fff" },
-  totalLabel:  { fontSize: "13px", fontWeight: "500", opacity: 0.85, marginBottom: "6px" },
-  totalAmount: { fontSize: "34px", fontWeight: "700", margin: "0 0 12px", letterSpacing: "-0.5px" },
-  statsRow:    { display: "flex", gap: "12px" },
-  statChip:    { flex: 1, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: "12px", padding: "10px 12px", textAlign: "center" },
-  statNum:     { fontSize: "20px", fontWeight: "700" },
-  statLbl:     { fontSize: "11px", opacity: 0.85, marginTop: "2px" },
-
-  card:        { backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  cardTitle:   { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-
-  searchWrap:  { display: "flex", alignItems: "center", gap: "8px", backgroundColor: "#fff", borderRadius: "12px", padding: "10px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  searchInput: { flex: 1, border: "none", outline: "none", fontSize: "14px", color: "#1a1a2e", fontFamily: "'DM Sans', sans-serif", backgroundColor: "transparent" },
-
-  tabs:  { display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "2px" },
-  tab:   (a) => ({ padding: "7px 14px", borderRadius: "20px", border: a ? "none" : "1.5px solid #e5e7eb", backgroundColor: a ? "#f97316" : "#fff", color: a ? "#fff" : "#6b7280", fontSize: "12px", fontWeight: a ? "700" : "500", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", boxShadow: a ? "0 2px 8px rgba(249,115,22,0.3)" : "none" }),
-
-  assetRow:   { display: "flex", alignItems: "center", padding: "13px 0", borderBottom: "1px solid #f3f4f6", gap: "12px", cursor: "pointer" },
-  assetLeft:  { flex: 1, minWidth: 0 },
-  assetName:  { fontSize: "14px", fontWeight: "600", color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  assetMeta:  { fontSize: "12px", color: "#9ca3af", marginTop: "2px" },
-  assetRight: { textAlign: "right", flexShrink: 0 },
-  assetValue: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e" },
-  badge: (bg, text) => ({ display: "inline-block", padding: "2px 8px", borderRadius: "99px", fontSize: "10px", fontWeight: "700", backgroundColor: bg, color: text, marginTop: "3px" }),
-
-  fab: { position: "fixed", bottom: "85px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", backgroundColor: "#f97316", border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(249,115,22,0.4)", zIndex: 100 },
-
-  overlay:         { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "flex-end" },
-  modal:           { backgroundColor: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" },
-  modalScrollArea: { padding: "24px 20px 8px", overflowY: "auto", flex: 1, minHeight: 0 },
-  submitBtnWrap:   { padding: "12px 20px 90px", backgroundColor: "#fff", borderTop: "1px solid #f3f4f6", flexShrink: 0 },
-  modalHeader:     { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" },
-  modalTitle:      { fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-  modalSub:        { fontSize: "13px", color: "#9ca3af", marginBottom: "20px" },
-  closeBtn:        { background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" },
-  label:           { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" },
-  input:           { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" },
-  row2:            { display: "flex", gap: "12px" },
-  textarea:        { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", minHeight: "72px", resize: "vertical", marginBottom: "14px" },
-  submitBtn:       { width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  deleteBtn:       { width: "100%", backgroundColor: "#fff", color: "#ef4444", border: "1.5px solid #fecaca", borderRadius: "12px", padding: "13px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: "10px" },
-
-  // Quantity adjuster
-  qtyBox:    { backgroundColor: "#f8fafc", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #e5e7eb" },
-  qtyTitle:  { fontSize: "13px", fontWeight: "700", color: "#374151", marginBottom: "10px" },
-  qtyDisplay:{ fontSize: "28px", fontWeight: "700", color: "#1a1a2e", textAlign: "center", margin: "4px 0 12px" },
-  qtyRow:    { display: "flex", gap: "10px", alignItems: "center" },
-  qtyBtn:    (color) => ({ flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: color, color: "#fff", fontSize: "20px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }),
-  qtyInput:  { flex: 2, border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" },
-  qtyHint:   { fontSize: "11px", color: "#9ca3af", textAlign: "center", marginTop: "8px" },
-  divider:   { border: "none", borderTop: "1px solid #f3f4f6", margin: "4px 0 16px" },
-
-  // Lost quantity box
-  lostBox:   { backgroundColor: "#fff5f5", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #fecaca" },
-  lostTitle: { fontSize: "13px", fontWeight: "700", color: "#b91c1c", marginBottom: "6px" },
-  lostDesc:  { fontSize: "12px", color: "#9ca3af", marginBottom: "10px" },
-  lostRow:   { display: "flex", gap: "10px", alignItems: "center" },
-  lostInput: { flex: 1, border: "1.5px solid #fecaca", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#b91c1c", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" },
-  lostBtn:   { flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-
-  emptyText: { textAlign: "center", color: "#9ca3af", padding: "30px 0", fontSize: "13px" },
-  toast: (type) => ({ position: "fixed", bottom: "90px", left: "50%", transform: "translateX(-50%)", backgroundColor: type === "error" ? "#ef4444" : "#22c55e", color: "#fff", padding: "10px 22px", borderRadius: "24px", fontSize: "13px", fontWeight: "700", zIndex: 300, boxShadow: "0 4px 14px rgba(0,0,0,0.18)", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }),
-};
-
-// ── Main Component ───────────────────────────────────────────────────────────
 export default function Assets() {
   const [assets, setAssets]       = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -120,7 +45,7 @@ export default function Assets() {
   const [saving, setSaving]       = useState(false);
   const [toast, setToast]         = useState(null);
   const [qtyChange, setQtyChange] = useState("");
-  const [lostQty, setLostQty]     = useState("");   // ← NEW: quantity lost field
+  const [lostQty, setLostQty]     = useState("");
 
   useEffect(() => { fetchAssets(); }, []);
 
@@ -129,11 +54,8 @@ export default function Assets() {
       setLoading(true);
       const res = await axios.get(`${BASE_URL}/api/assets`);
       setAssets(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      showToast("Failed to fetch assets", "error");
-    } finally {
-      setLoading(false);
-    }
+    } catch { showToast("Failed to fetch assets", "error"); }
+    finally { setLoading(false); }
   };
 
   const showToast = (msg, type = "success") => {
@@ -156,33 +78,27 @@ export default function Assets() {
       description:  asset.description  || "",
       quantity:     asset.quantity != null ? asset.quantity : "",
     });
-    setQtyChange("");
-    setLostQty("");   // ← reset lost qty on open
-    setShowModal(true);
+    setQtyChange(""); setLostQty(""); setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false); setEditing(null); setForm(EMPTY_FORM); setQtyChange(""); setLostQty("");
   };
 
-  // +/- quantity buttons
   const applyQty = (delta) => {
     const change = Number(qtyChange);
     if (!change || change <= 0) { showToast("Enter a valid quantity", "error"); return; }
-    const current = Number(form.quantity) || 0;
-    const next    = Math.max(0, current + delta * change);
+    const next = Math.max(0, (Number(form.quantity) || 0) + delta * change);
     setForm(f => ({ ...f, quantity: next }));
     setQtyChange("");
   };
 
-  // ── NEW: apply lost quantity ──────────────────────────────────────────────
   const applyLost = () => {
     const lost = Number(lostQty);
     if (!lost || lost <= 0) { showToast("Enter a valid lost quantity", "error"); return; }
     const current = Number(form.quantity) || 0;
     if (lost > current) { showToast("Lost qty cannot exceed current stock", "error"); return; }
-    const next = current - lost;
-    setForm(f => ({ ...f, quantity: next }));
+    setForm(f => ({ ...f, quantity: current - lost }));
     setLostQty("");
     showToast(`Deducted ${lost} from quantity`);
   };
@@ -204,9 +120,7 @@ export default function Assets() {
       closeModal();
     } catch (err) {
       showToast(err.response?.data?.error || "Something went wrong", "error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
@@ -216,12 +130,9 @@ export default function Assets() {
       setAssets(prev => prev.filter(a => a._id !== editing._id));
       showToast("Asset deleted.");
       closeModal();
-    } catch (err) {
-      showToast("Failed to delete asset", "error");
-    }
+    } catch { showToast("Failed to delete asset", "error"); }
   };
 
-  // ── Derived ──
   const totalValue    = assets.reduce((s, a) => s + Number(a.value || 0), 0);
   const activeCount   = assets.filter(a => a.status === "active").length;
   const maintCount    = assets.filter(a => a.status === "maintenance").length;
@@ -241,194 +152,349 @@ export default function Assets() {
         return acc;
       }, {});
 
+  const inp = { width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", boxSizing: "border-box", backgroundColor: "#fff", marginBottom: "14px" };
+  const lbl = { fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px", display: "block" };
+
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={S.page}>
+      <style>{`
+        .assets-page {
+          background-color: #f5f6fa;
+          min-height: 100vh;
+          font-family: 'DM Sans', sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+        .assets-header {
+          padding: 20px 20px 14px;
+          background: #fff;
+          border-bottom: 1px solid #eeeff3;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          flex-shrink: 0;
+        }
+        .assets-toolbar {
+          background: #fff;
+          padding: 10px 20px 0;
+          position: sticky;
+          top: 61px;
+          z-index: 9;
+          flex-shrink: 0;
+          border-bottom: 1px solid #f3f4f6;
+        }
+        .assets-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px 16px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .assets-fab {
+          position: fixed;
+          bottom: 85px;
+          right: 20px;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background-color: #f97316;
+          border: none;
+          color: #fff;
+          font-size: 26px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 16px rgba(249,115,22,0.4);
+          z-index: 100;
+        }
+        /* Modal */
+        .assets-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.45);
+          z-index: 200;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+        .assets-modal {
+          background: #fff;
+          border-radius: 24px 24px 0 0;
+          width: 100%;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .assets-modal-scroll {
+          padding: 24px 20px 8px;
+          overflow-y: auto;
+          flex: 1;
+          min-height: 0;
+        }
+        .assets-modal-footer {
+          padding: 12px 20px 90px;
+          background: #fff;
+          border-top: 1px solid #f3f4f6;
+          flex-shrink: 0;
+        }
+        /* Asset list grid */
+        .assets-list {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        /* Toast */
+        .assets-toast {
+          position: fixed;
+          bottom: 90px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 10px 22px;
+          border-radius: 24px;
+          font-size: 13px;
+          font-weight: 700;
+          z-index: 300;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+          white-space: nowrap;
+          font-family: 'DM Sans', sans-serif;
+          color: #fff;
+        }
 
-        {/* ── Header ── */}
-        <div style={S.header}>
-          <div style={S.headerRow}>
-            <h1 style={S.title}>Assets</h1>
-          </div>
+        /* ── Desktop ── */
+        @media (min-width: 768px) {
+          .assets-header {
+            padding: 20px 32px 14px;
+          }
+          .assets-toolbar {
+            padding: 10px 32px 0;
+            top: 65px;
+          }
+          .assets-body {
+            padding: 24px 32px 40px;
+          }
+          .assets-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: start;
+          }
+          .assets-fab {
+            bottom: 32px;
+            right: 32px;
+          }
+          /* Centered dialog */
+          .assets-modal-overlay {
+            align-items: center;
+            padding: 24px;
+          }
+          .assets-modal {
+            border-radius: 20px;
+            max-width: 540px;
+            max-height: 88vh;
+          }
+          .assets-modal-scroll {
+            padding: 28px 28px 8px;
+          }
+          .assets-modal-footer {
+            padding: 16px 28px 24px;
+          }
+        }
+      `}</style>
+
+      <div className="assets-page">
+
+        {/* Header */}
+        <div className="assets-header">
+          <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>Assets</h1>
         </div>
 
-        <div style={S.body}>
-
-          {/* ── Hero card ── */}
-          <div style={S.totalCard}>
-            <div style={S.totalLabel}>Total Asset Value</div>
-            <div style={S.totalAmount}>{fmt(totalValue)}</div>
-            <div style={S.statsRow}>
-              <div style={S.statChip}><div style={S.statNum}>{activeCount}</div><div style={S.statLbl}>Active</div></div>
-              <div style={S.statChip}><div style={S.statNum}>{maintCount}</div><div style={S.statLbl}>Maintenance</div></div>
-              <div style={S.statChip}><div style={S.statNum}>{disposedCount}</div><div style={S.statLbl}>Disposed</div></div>
-              <div style={S.statChip}><div style={S.statNum}>{assets.length}</div><div style={S.statLbl}>Total</div></div>
-            </div>
-          </div>
-
-          {/* ── Search ── */}
-          <div style={S.searchWrap}>
+        {/* Toolbar: search + tabs */}
+        <div className="assets-toolbar">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", backgroundColor: "#f5f6fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "10px" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input style={S.searchInput} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input style={{ flex: 1, border: "none", outline: "none", fontSize: "14px", color: "#1a1a2e", fontFamily: "'DM Sans', sans-serif", backgroundColor: "transparent" }}
+              placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
             {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "18px", lineHeight: 1 }}>✕</button>}
           </div>
-
-          {/* ── Category tabs ── */}
-          <div style={S.tabs}>
-            {CATEGORIES.map(c => (
-              <button key={c.key} style={S.tab(activeCat === c.key)} onClick={() => setActiveCat(c.key)}>{c.label}</button>
-            ))}
-          </div>
-
-          {/* ── List ── */}
-          {loading ? (
-            <div style={S.card}><div style={S.emptyText}>Loading assets...</div></div>
-          ) : filtered.length === 0 ? (
-            <div style={S.card}><div style={S.emptyText}>{search ? "No assets match your search." : "No assets yet. Tap + to add one."}</div></div>
-          ) : (
-            Object.entries(grouped).map(([catKey, items]) => {
-              const catLabel = CATEGORIES.find(c => c.key === catKey)?.label || catKey;
-              const catColor = CAT_COLORS[catKey] || CAT_COLORS.other;
-              const catTotal = items.reduce((s, a) => s + Number(a.value || 0), 0);
+          <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "10px" }}>
+            {CATEGORIES.map(c => {
+              const active = activeCat === c.key;
               return (
-                <div key={catKey} style={S.card}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: catColor.dot }} />
-                      <span style={S.cardTitle}>{catLabel}</span>
-                    </div>
-                    <span style={{ fontSize: "13px", fontWeight: "700", color: "#9ca3af" }}>{fmt(catTotal)}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>
-                    {items.length} item{items.length !== 1 ? "s" : ""}
-                  </div>
-
-                  {items.map(asset => {
-                    const statusCfg = STATUS_CFG[asset.status] || STATUS_CFG.active;
-                    return (
-                      <div key={asset._id} style={S.assetRow} onClick={() => openEdit(asset)}>
-                        <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: catColor.dot, flexShrink: 0 }} />
-                        <div style={S.assetLeft}>
-                          <div style={S.assetName}>{asset.name}</div>
-                          <div style={S.assetMeta}>
-                            {fmtDate(asset.purchaseDate)}
-                            {asset.quantity != null ? ` · Qty: ${asset.quantity}` : ""}
-                            {asset.description ? ` · ${asset.description.slice(0, 25)}${asset.description.length > 25 ? "…" : ""}` : ""}
-                          </div>
-                          <span style={S.badge(statusCfg.bg, statusCfg.text)}>{statusCfg.label}</span>
-                        </div>
-                        <div style={S.assetRight}>
-                          <div style={S.assetValue}>{fmt(asset.value)}</div>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: "6px" }}>
-                            <polyline points="9 18 15 12 9 6"/>
-                          </svg>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <button key={c.key} onClick={() => setActiveCat(c.key)}
+                  style={{ padding: "7px 14px", borderRadius: "20px", border: active ? "none" : "1.5px solid #e5e7eb", backgroundColor: active ? "#f97316" : "#fff", color: active ? "#fff" : "#6b7280", fontSize: "12px", fontWeight: active ? "700" : "500", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", boxShadow: active ? "0 2px 8px rgba(249,115,22,0.3)" : "none", flexShrink: 0 }}>
+                  {c.label}
+                </button>
               );
-            })
-          )}
+            })}
+          </div>
         </div>
 
-        {/* ── FAB ── */}
-        <button style={S.fab} onClick={openAdd}>+</button>
+        {/* Body */}
+        <div className="assets-body">
 
-        {/* ── Modal ── */}
-        {showModal && (
-          <div style={S.overlay} onClick={e => e.target === e.currentTarget && closeModal()}>
-            <div style={S.modal}>
-              <div style={S.modalScrollArea}>
-
-                <div style={S.modalHeader}>
-                  <h2 style={S.modalTitle}>{editing ? "Edit Asset" : "Add Asset"}</h2>
-                  <button style={S.closeBtn} onClick={closeModal}>✕</button>
+          {/* Hero Card */}
+          <div style={{ background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)", borderRadius: "18px", padding: "20px 24px", color: "#fff" }}>
+            <div style={{ fontSize: "13px", fontWeight: "500", opacity: 0.85, marginBottom: "6px" }}>Total Asset Value</div>
+            <div style={{ fontSize: "34px", fontWeight: "700", margin: "0 0 12px", letterSpacing: "-0.5px" }}>{fmt(totalValue)}</div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              {[
+                { num: activeCount,   lbl: "Active"      },
+                { num: maintCount,    lbl: "Maintenance" },
+                { num: disposedCount, lbl: "Disposed"    },
+                { num: assets.length, lbl: "Total"       },
+              ].map(({ num, lbl: l }) => (
+                <div key={l} style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: "12px", padding: "10px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: "20px", fontWeight: "700" }}>{num}</div>
+                  <div style={{ fontSize: "11px", opacity: 0.85, marginTop: "2px" }}>{l}</div>
                 </div>
-                <p style={S.modalSub}>{editing ? `Editing · ${editing.name}` : "Enter asset details below"}</p>
+              ))}
+            </div>
+          </div>
 
-                {/* Name */}
-                <label style={S.label}>Asset Name *</label>
-                <input style={S.input} placeholder="e.g. Delivery Truck" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          {/* Asset Groups */}
+          <div className="assets-list">
+            {loading ? (
+              <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", gridColumn: "1/-1" }}>
+                <div style={{ textAlign: "center", color: "#9ca3af", padding: "30px 0", fontSize: "13px" }}>Loading assets...</div>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", gridColumn: "1/-1" }}>
+                <div style={{ textAlign: "center", color: "#9ca3af", padding: "30px 0", fontSize: "13px" }}>
+                  {search ? "No assets match your search." : "No assets yet. Tap + to add one."}
+                </div>
+              </div>
+            ) : (
+              Object.entries(grouped).map(([catKey, items]) => {
+                const catLabel = CATEGORIES.find(c => c.key === catKey)?.label || catKey;
+                const catColor = CAT_COLORS[catKey] || CAT_COLORS.other;
+                const catTotal = items.reduce((s, a) => s + Number(a.value || 0), 0);
+                return (
+                  <div key={catKey} style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: catColor.dot }} />
+                        <span style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>{catLabel}</span>
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: "700", color: "#9ca3af" }}>{fmt(catTotal)}</span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>{items.length} item{items.length !== 1 ? "s" : ""}</div>
 
-                {/* Status */}
-                <label style={S.label}>Status</label>
-                <select style={S.input} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                    {items.map(asset => {
+                      const statusCfg = STATUS_CFG[asset.status] || STATUS_CFG.active;
+                      return (
+                        <div key={asset._id} onClick={() => openEdit(asset)}
+                          style={{ display: "flex", alignItems: "center", padding: "13px 0", borderBottom: "1px solid #f3f4f6", gap: "12px", cursor: "pointer" }}>
+                          <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: catColor.dot, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "14px", fontWeight: "600", color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
+                            <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>
+                              {fmtDate(asset.purchaseDate)}
+                              {asset.quantity != null ? ` · Qty: ${asset.quantity}` : ""}
+                              {asset.description ? ` · ${asset.description.slice(0, 25)}${asset.description.length > 25 ? "…" : ""}` : ""}
+                            </div>
+                            <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "99px", fontSize: "10px", fontWeight: "700", backgroundColor: statusCfg.bg, color: statusCfg.text, marginTop: "3px" }}>
+                              {statusCfg.label}
+                            </span>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e" }}>{fmt(asset.value)}</div>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: "6px" }}>
+                              <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+        </div>
+
+        {/* FAB */}
+        <button className="assets-fab" onClick={openAdd}>+</button>
+
+        {/* Modal */}
+        {showModal && (
+          <div className="assets-modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+            <div className="assets-modal">
+              <div className="assets-modal-scroll">
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#1a1a2e", margin: 0 }}>{editing ? "Edit Asset" : "Add Asset"}</h2>
+                  <button style={{ background: "none", border: "none", fontSize: "22px", color: "#9ca3af", cursor: "pointer" }} onClick={closeModal}>✕</button>
+                </div>
+                <p style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "20px" }}>{editing ? `Editing · ${editing.name}` : "Enter asset details below"}</p>
+
+                <label style={lbl}>Asset Name *</label>
+                <input style={inp} placeholder="e.g. Delivery Truck" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+
+                <label style={lbl}>Status</label>
+                <select style={inp} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                   {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
 
-                {/* Value + Purchase Date */}
-                <div style={S.row2}>
+                <div style={{ display: "flex", gap: "12px" }}>
                   <div style={{ flex: 1 }}>
-                    <label style={S.label}>Value (₱) *</label>
-                    <input style={S.input} type="number" placeholder="0.00" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} />
+                    <label style={lbl}>Value (₱) *</label>
+                    <input style={inp} type="number" placeholder="0.00" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={S.label}>Purchase Date</label>
-                    <input style={S.input} type="date" value={form.purchaseDate} onChange={e => setForm({ ...form, purchaseDate: e.target.value })} />
+                    <label style={lbl}>Purchase Date</label>
+                    <input style={inp} type="date" value={form.purchaseDate} onChange={e => setForm({ ...form, purchaseDate: e.target.value })} />
                   </div>
                 </div>
 
-                {/* Description */}
-                <label style={S.label}>Description</label>
-                <textarea style={S.textarea} placeholder="Optional notes..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                <label style={lbl}>Description</label>
+                <textarea style={{ ...inp, minHeight: "72px", resize: "vertical" }} placeholder="Optional notes..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
 
-                {/* ADD MODE — simple qty input */}
+                {/* ADD MODE — simple qty */}
                 {!editing && (
                   <>
-                    <label style={S.label}>Quantity <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span></label>
-                    <input style={S.input} type="number" min="0" placeholder="e.g. 5" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+                    <label style={lbl}>Quantity <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span></label>
+                    <input style={inp} type="number" min="0" placeholder="e.g. 5" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
                   </>
                 )}
 
-                {/* EDIT MODE — quantity adjuster + lost section */}
+                {/* EDIT MODE — qty adjuster + lost */}
                 {editing && (
                   <>
-                    <hr style={S.divider} />
+                    <hr style={{ border: "none", borderTop: "1px solid #f3f4f6", margin: "4px 0 16px" }} />
 
                     {/* Adjust Quantity */}
-                    <div style={S.qtyBox}>
-                      <div style={S.qtyTitle}>📦 Adjust Quantity</div>
-                      <div style={S.qtyDisplay}>
+                    <div style={{ backgroundColor: "#f8fafc", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #e5e7eb" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#374151", marginBottom: "10px" }}>📦 Adjust Quantity</div>
+                      <div style={{ fontSize: "28px", fontWeight: "700", color: "#1a1a2e", textAlign: "center", margin: "4px 0 12px" }}>
                         {form.quantity !== "" && form.quantity != null ? form.quantity : "—"}
                       </div>
-                      <div style={S.qtyRow}>
-                        <button style={S.qtyBtn("#ef4444")} onClick={() => applyQty(-1)}>−</button>
-                        <input
-                          style={S.qtyInput}
-                          type="number"
-                          min="1"
-                          placeholder="Qty"
-                          value={qtyChange}
-                          onChange={e => setQtyChange(e.target.value)}
-                        />
-                        <button style={S.qtyBtn("#22c55e")} onClick={() => applyQty(+1)}>+</button>
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <button onClick={() => applyQty(-1)}
+                          style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#fff", fontSize: "20px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>−</button>
+                        <input type="number" min="1" placeholder="Qty" value={qtyChange} onChange={e => setQtyChange(e.target.value)}
+                          style={{ flex: 2, border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#1a1a2e", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" }} />
+                        <button onClick={() => applyQty(+1)}
+                          style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: "#22c55e", color: "#fff", fontSize: "20px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>+</button>
                       </div>
-                      <div style={S.qtyHint}>Enter amount · tap − to deduct or + to add</div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af", textAlign: "center", marginTop: "8px" }}>Enter amount · tap − to deduct or + to add</div>
                     </div>
 
-                    {/* ── NEW: Lost / Damaged Quantity ── */}
-                    <div style={S.lostBox}>
-                      <div style={S.lostTitle}>⚠️ Lost / Damaged</div>
-                      <div style={S.lostDesc}>
-                        Log items that were lost, stolen, or damaged. This will deduct from current quantity.
-                      </div>
-                      <div style={S.lostRow}>
-                        <input
-                          style={S.lostInput}
-                          type="number"
-                          min="1"
-                          placeholder="Qty lost"
-                          value={lostQty}
-                          onChange={e => setLostQty(e.target.value)}
-                          onKeyDown={e => e.key === "Enter" && applyLost()}
-                        />
-                        <button style={S.lostBtn} onClick={applyLost}>
-                          Apply Loss
-                        </button>
+                    {/* Lost / Damaged */}
+                    <div style={{ backgroundColor: "#fff5f5", borderRadius: "14px", padding: "14px", marginBottom: "14px", border: "1.5px solid #fecaca" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#b91c1c", marginBottom: "6px" }}>⚠️ Lost / Damaged</div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "10px" }}>Log items that were lost, stolen, or damaged. This will deduct from current quantity.</div>
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <input type="number" min="1" placeholder="Qty lost" value={lostQty} onChange={e => setLostQty(e.target.value)} onKeyDown={e => e.key === "Enter" && applyLost()}
+                          style={{ flex: 1, border: "1.5px solid #fecaca", borderRadius: "10px", padding: "10px 14px", fontSize: "16px", fontFamily: "'DM Sans', sans-serif", color: "#b91c1c", outline: "none", textAlign: "center", boxSizing: "border-box", backgroundColor: "#fff" }} />
+                        <button onClick={applyLost}
+                          style={{ flex: 1, padding: "11px", borderRadius: "10px", border: "none", backgroundColor: "#ef4444", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Apply Loss</button>
                       </div>
                     </div>
                   </>
@@ -436,20 +502,29 @@ export default function Assets() {
 
               </div>
 
-              <div style={S.submitBtnWrap}>
-                <button style={S.submitBtn} onClick={handleSave} disabled={saving}>
+              <div className="assets-modal-footer">
+                <button onClick={handleSave} disabled={saving}
+                  style={{ width: "100%", backgroundColor: "#f97316", color: "#fff", border: "none", borderRadius: "12px", padding: "15px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                   {saving ? "Saving..." : editing ? "💾 Save Changes" : "💾 Add Asset"}
                 </button>
                 {editing && (
-                  <button style={S.deleteBtn} onClick={handleDelete}>🗑 Delete Asset</button>
+                  <button onClick={handleDelete}
+                    style={{ width: "100%", backgroundColor: "#fff", color: "#ef4444", border: "1.5px solid #fecaca", borderRadius: "12px", padding: "13px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: "10px" }}>
+                    🗑 Delete Asset
+                  </button>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Toast ── */}
-        {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
+        {/* Toast */}
+        {toast && (
+          <div className="assets-toast" style={{ backgroundColor: toast.type === "error" ? "#ef4444" : "#22c55e" }}>
+            {toast.msg}
+          </div>
+        )}
+
       </div>
     </>
   );

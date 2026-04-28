@@ -5,42 +5,6 @@ import DateRangeFilter, { getDefaultDateRange, filterByDateRange } from "./Month
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const S = {
-  page: { backgroundColor: "#f5f6fa", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", paddingBottom: "90px" },
-  header: { padding: "20px 20px 12px" },
-  headerTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" },
-  storeName: { fontSize: "22px", fontWeight: "700", color: "#1a1a2e", margin: 0 },
-  date: { fontSize: "13px", color: "#9ca3af", marginTop: "2px" },
-  reportsBtn: { background: "none", border: "none", color: "#f97316", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 },
-  body: { padding: "0 16px", display: "flex", flexDirection: "column", gap: "12px" },
-  metricsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
-  metricCard: { backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  metricIcon: (bg) => ({ width: "38px", height: "38px", borderRadius: "10px", backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px" }),
-  metricLabel: { fontSize: "12px", color: "#9ca3af", marginBottom: "4px" },
-  metricValue: (color) => ({ fontSize: "20px", fontWeight: "700", color, margin: 0 }),
-  metricBadge: (color) => ({ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "11px", fontWeight: "600", color, backgroundColor: `${color}18`, borderRadius: "20px", padding: "2px 7px", marginTop: "4px" }),
-  metricSub: { fontSize: "11px", color: "#9ca3af", marginTop: "3px" },
-  sectionTitle: { fontSize: "15px", fontWeight: "700", color: "#1a1a2e", margin: "4px 0 0" },
-  actionsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" },
-  actionCard: () => ({ backgroundColor: "#fff", borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer", border: "none", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }),
-  actionIcon: (bg) => ({ width: "44px", height: "44px", borderRadius: "12px", backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center" }),
-  actionLabel: (color) => ({ fontSize: "13px", fontWeight: "600", color }),
-  card: { backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  activityItem: { display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", borderBottom: "1px solid #f3f4f6" },
-  activityDot: (color) => ({ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: color, flexShrink: 0 }),
-  activityName: { fontSize: "14px", fontWeight: "600", color: "#1a1a2e", margin: 0 },
-  activityDate: { fontSize: "11px", color: "#9ca3af", marginTop: "2px" },
-  activityAmount: (positive) => ({ fontSize: "14px", fontWeight: "700", color: positive ? "#16a34a" : "#ef4444", marginLeft: "auto" }),
-  emptyText: { fontSize: "13px", color: "#9ca3af", textAlign: "center", padding: "16px 0" },
-  alertClose: { background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: 0 },
-  alertLink: (color) => ({ fontSize: "12px", fontWeight: "700", color, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }),
-  monthBanner: { background: "linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)", borderRadius: "16px", padding: "16px 18px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  monthBannerLabel: { fontSize: "12px", opacity: 0.6, marginBottom: "4px" },
-  monthBannerValue: { fontSize: "22px", fontWeight: "700" },
-  monthBannerSub: { fontSize: "11px", opacity: 0.5, marginTop: "2px" },
-  monthStatItem: { textAlign: "right" },
-};
-
 const today = new Date().toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
 const fmtShort = (dateStr) => new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
@@ -50,6 +14,11 @@ const QUICK_ACTIONS = [
   { label: "Add Expense", icon: "🧾", color: "#ef4444", bg: "#fef2f2", route: "/costs" },
   { label: "Add Utang", icon: "👤", color: "#3b82f6", bg: "#eff6ff", route: "/utang" },
 ];
+
+const alertColors = { warning: "#d97706", danger: "#ef4444", info: "#3b82f6" };
+const alertBgs = { warning: "#fffbeb", danger: "#fef2f2", info: "#eff6ff" };
+const alertBorders = { warning: "#fde68a", danger: "#fecaca", info: "#bfdbfe" };
+const alertIcons = { warning: "⚠️", danger: "🚨", info: "ℹ️" };
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -81,7 +50,6 @@ export default function Dashboard() {
 
   const dismiss = (key) => setDismissedAlerts(p => [...p, key]);
 
-  // ── Filter by selected date range ────────────────────────────────────────
   const rangeSales = filterByDateRange(sales, "saleDate", dateRange);
   const rangeCosts = filterByDateRange(costs, "costDate", dateRange);
 
@@ -104,7 +72,6 @@ export default function Dashboard() {
     return diff >= 0 && diff <= 7;
   });
 
-  // Previous period comparison (same number of days before the range)
   const rangeDays = Math.round((new Date(dateRange.to) - new Date(dateRange.from)) / (1000 * 60 * 60 * 24)) + 1;
   const prevEnd = new Date(dateRange.from);
   prevEnd.setDate(prevEnd.getDate() - 1);
@@ -137,102 +104,257 @@ export default function Dashboard() {
     { label: "Total Utang", value: fmt(totalUtang), color: "#ef4444", iconBg: "#fef2f2", icon: "👥", sub: `${utangCustomers.filter(c => parseFloat(c.balance) > 0).length} with debt`, badge: null },
   ];
 
-  const alertColors = { warning: "#d97706", danger: "#ef4444", info: "#3b82f6" };
-  const alertBgs = { warning: "#fffbeb", danger: "#fef2f2", info: "#eff6ff" };
-  const alertBorders = { warning: "#fde68a", danger: "#fecaca", info: "#bfdbfe" };
-  const alertIcons = { warning: "⚠️", danger: "🚨", info: "ℹ️" };
-
   const recentSales = [...sales].sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate)).slice(0, 5);
 
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={S.page}>
-        <div style={S.header}>
-          <div style={S.headerTop}>
+      <style>{`
+        .db-page {
+          background-color: #f5f6fa;
+          min-height: 100vh;
+          font-family: 'DM Sans', sans-serif;
+          /* Fill the full height of the app-content flex column */
+          display: flex;
+          flex-direction: column;
+        }
+
+        .db-header {
+          background: #fff;
+          border-bottom: 1px solid #eeeff3;
+          padding: 18px 20px 14px;
+          flex-shrink: 0;
+        }
+
+        .db-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 12px;
+        }
+
+        .db-store-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #1a1a2e;
+          margin: 0;
+        }
+
+        .db-date {
+          font-size: 13px;
+          color: #9ca3af;
+          margin: 2px 0 0;
+        }
+
+        .db-reports-btn {
+          background: none;
+          border: none;
+          color: #f97316;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          padding: 0;
+          flex-shrink: 0;
+          margin-top: 4px;
+        }
+
+        /* The scrollable content area */
+        .db-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px 16px 100px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .db-metrics-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .db-actions-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        .db-bottom-row {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        /* ── Desktop ── */
+        @media (min-width: 768px) {
+          .db-header {
+            padding: 22px 32px 16px;
+          }
+          .db-store-name {
+            font-size: 22px;
+          }
+          .db-body {
+            padding: 24px 32px 40px;
+          }
+          .db-metrics-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+          .db-actions-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+          .db-bottom-row {
+            flex-direction: row;
+            align-items: flex-start;
+          }
+          .db-bottom-left {
+            flex: 0 0 360px;
+          }
+          .db-bottom-right {
+            flex: 1;
+            min-width: 0;
+          }
+        }
+      `}</style>
+
+      <div className="db-page">
+
+        {/* ── Header ── */}
+        <div className="db-header">
+          <div className="db-header-row">
             <div>
-              <h1 style={S.storeName}>Magandang Araw Honrado Fam! 👋</h1>
-              <p style={S.date}>{today}</p>
+              <h1 className="db-store-name">Magandang Araw Honrado Fam! 👋</h1>
+              <p className="db-date">{today}</p>
             </div>
-            <button style={S.reportsBtn} onClick={() => navigate("/sales")}>Reports</button>
+            <button className="db-reports-btn" onClick={() => navigate("/sales")}>Reports</button>
           </div>
           <DateRangeFilter range={dateRange} onChange={setDateRange} />
         </div>
 
-        <div style={S.body}>
-          {/* Range Revenue Banner */}
+        {/* ── Body ── */}
+        <div className="db-body">
+
+          {/* Revenue Banner */}
           {!loading && (
-            <div style={S.monthBanner}>
+            <div style={{
+              background: "linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%)",
+              borderRadius: "16px",
+              padding: "20px 24px",
+              color: "#fff",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}>
               <div>
-                <div style={S.monthBannerLabel}>Revenue</div>
-                <div style={S.monthBannerValue}>{fmt(rangeRevenue)}</div>
-                <div style={S.monthBannerSub}>{rangeLabel}</div>
+                <div style={{ fontSize: "12px", opacity: 0.6, marginBottom: "4px" }}>Revenue</div>
+                <div style={{ fontSize: "26px", fontWeight: "700" }}>{fmt(rangeRevenue)}</div>
+                <div style={{ fontSize: "11px", opacity: 0.5, marginTop: "2px" }}>{rangeLabel}</div>
               </div>
-              <div style={S.monthStatItem}>
-                <div style={S.monthBannerLabel}>Expenses</div>
-                <div style={{ fontSize: "17px", fontWeight: "700", color: "#fca5a5" }}>{fmt(rangeExpenses)}</div>
-                <div style={{ ...S.monthBannerLabel, marginTop: "8px" }}>Net Profit</div>
-                <div style={{ fontSize: "17px", fontWeight: "700", color: netProfit >= 0 ? "#86efac" : "#fca5a5" }}>{fmt(netProfit)}</div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "12px", opacity: 0.6, marginBottom: "4px" }}>Expenses</div>
+                <div style={{ fontSize: "18px", fontWeight: "700", color: "#fca5a5" }}>{fmt(rangeExpenses)}</div>
+                <div style={{ fontSize: "12px", opacity: 0.6, marginTop: "10px", marginBottom: "4px" }}>Net Profit</div>
+                <div style={{ fontSize: "18px", fontWeight: "700", color: netProfit >= 0 ? "#86efac" : "#fca5a5" }}>{fmt(netProfit)}</div>
               </div>
             </div>
           )}
 
           {/* Alerts */}
           {!loading && alerts.map((alert) => (
-            <div key={alert.key} style={{ backgroundColor: alertBgs[alert.type], border: `1px solid ${alertBorders[alert.type]}`, borderRadius: "12px", padding: "12px 14px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <div key={alert.key} style={{
+              backgroundColor: alertBgs[alert.type],
+              border: `1px solid ${alertBorders[alert.type]}`,
+              borderRadius: "12px",
+              padding: "12px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}>
               <span style={{ fontSize: "16px" }}>{alertIcons[alert.type]}</span>
               <span style={{ fontSize: "13px", color: "#374151", flex: 1 }}>{alert.text}</span>
-              <button style={S.alertLink(alertColors[alert.type])} onClick={() => navigate(alert.route)}>{alert.link}</button>
-              <button style={S.alertClose} onClick={() => dismiss(alert.key)}>✕</button>
+              <button style={{ fontSize: "12px", fontWeight: "700", color: alertColors[alert.type], background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }} onClick={() => navigate(alert.route)}>{alert.link}</button>
+              <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "16px", padding: 0 }} onClick={() => dismiss(alert.key)}>✕</button>
             </div>
           ))}
 
+          {/* Metrics */}
           {loading ? (
-            <div style={{ textAlign: "center", padding: "30px", color: "#9ca3af", fontSize: "14px" }}>Loading...</div>
+            <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af", fontSize: "14px" }}>Loading...</div>
           ) : (
-            <div style={S.metricsGrid}>
+            <div className="db-metrics-grid">
               {METRICS.map((m) => (
-                <div key={m.label} style={S.metricCard}>
-                  <div style={S.metricIcon(m.iconBg)}><span style={{ fontSize: "18px" }}>{m.icon}</span></div>
-                  <div style={S.metricLabel}>{m.label}</div>
-                  <div style={S.metricValue(m.color)}>{m.value}</div>
-                  <div style={S.metricSub}>{m.sub}</div>
-                  {m.badge && <div style={S.metricBadge(m.badge.color)}>{m.badge.text}</div>}
+                <div key={m.label} style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                  <div style={{ width: "38px", height: "38px", borderRadius: "10px", backgroundColor: m.iconBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
+                    <span style={{ fontSize: "18px" }}>{m.icon}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#9ca3af", marginBottom: "4px" }}>{m.label}</div>
+                  <div style={{ fontSize: "20px", fontWeight: "700", color: m.color }}>{m.value}</div>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "3px" }}>{m.sub}</div>
+                  {m.badge && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "11px", fontWeight: "600", color: m.badge.color, backgroundColor: `${m.badge.color}18`, borderRadius: "20px", padding: "2px 7px", marginTop: "4px" }}>
+                      {m.badge.text}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          <div style={S.sectionTitle}>Quick Actions</div>
-          <div style={S.actionsGrid}>
-            {QUICK_ACTIONS.map((a) => (
-              <button key={a.label} style={S.actionCard(a.color)} onClick={() => navigate(a.route)}>
-                <div style={S.actionIcon(a.bg)}><span style={{ fontSize: "20px" }}>{a.icon}</span></div>
-                <span style={S.actionLabel(a.color)}>{a.label}</span>
-              </button>
-            ))}
-          </div>
+          {/* Quick Actions + Recent Activity */}
+          {!loading && (
+            <div className="db-bottom-row">
 
-          <div style={S.sectionTitle}>Recent Activity</div>
-          <div style={S.card}>
-            {recentSales.length === 0 ? (
-              <div style={S.emptyText}>No recent activity yet.</div>
-            ) : (
-              recentSales.map((sale, i) => {
-                const isLast = i === recentSales.length - 1;
-                return (
-                  <div key={sale._id || sale.id} style={{ ...S.activityItem, borderBottom: isLast ? "none" : "1px solid #f3f4f6" }}>
-                    <div style={S.activityDot("#f97316")} />
-                    <div style={{ flex: 1 }}>
-                      <p style={S.activityName}>{sale.productName}</p>
-                      <p style={S.activityDate}>{new Date(sale.saleDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</p>
-                    </div>
-                    <div style={S.activityAmount(true)}>+₱{parseFloat(sale.total || sale.unitPrice || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+              {/* Quick Actions */}
+              <div className="db-bottom-left">
+                <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e", marginBottom: "10px" }}>Quick Actions</div>
+                <div className="db-actions-grid">
+                  {QUICK_ACTIONS.map((a) => (
+                    <button
+                      key={a.label}
+                      onClick={() => navigate(a.route)}
+                      style={{ backgroundColor: "#fff", borderRadius: "14px", padding: "16px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer", border: "none", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", width: "100%" }}
+                    >
+                      <div style={{ width: "44px", height: "44px", borderRadius: "12px", backgroundColor: a.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "20px" }}>{a.icon}</span>
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: "600", color: a.color }}>{a.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="db-bottom-right">
+                <div style={{ fontSize: "15px", fontWeight: "700", color: "#1a1a2e", marginBottom: "10px" }}>Recent Activity</div>
+                <div style={{ backgroundColor: "#fff", borderRadius: "16px", padding: "4px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                  {recentSales.length === 0 ? (
+                    <div style={{ fontSize: "13px", color: "#9ca3af", textAlign: "center", padding: "24px 0" }}>No recent activity yet.</div>
+                  ) : (
+                    recentSales.map((sale, i) => {
+                      const isLast = i === recentSales.length - 1;
+                      return (
+                        <div key={sale._id || sale.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: isLast ? "none" : "1px solid #f3f4f6" }}>
+                          <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f97316", flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: "14px", fontWeight: "600", color: "#1a1a2e", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sale.productName}</p>
+                            <p style={{ fontSize: "11px", color: "#9ca3af", margin: "2px 0 0" }}>
+                              {new Date(sale.saleDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+                            </p>
+                          </div>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#16a34a", flexShrink: 0 }}>
+                            +₱{parseFloat(sale.total || sale.unitPrice || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
+
         </div>
       </div>
     </>
