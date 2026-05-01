@@ -1,4 +1,4 @@
-# 🏪 Tindahan ni Aling — Sari-Store Manager
+# 🏪  My Store Management
 
 A full-featured inventory and business management app built for a small Filipino sari-sari store. Designed for both mobile and desktop use with a responsive sidebar layout.
 
@@ -178,6 +178,5 @@ This resets to the default password `tindahan2024`.
 
 ---
 
-## 📄 License
 
 Private use only — built for personal store management.

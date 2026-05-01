@@ -228,7 +228,7 @@ export default function PasswordGate({ children }) {
           {/* ── LOGIN MODE ── */}
           {mode === "login" && (
             <>
-              <h1 className="pg-title">Tindahan ni Aling</h1>
+              <h1 className="pg-title">My Store Management</h1>
               <p className="pg-sub">Enter your password to continue</p>
 
               {successMsg && <div className="pg-success">{successMsg}</div>}
