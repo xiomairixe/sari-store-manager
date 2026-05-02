@@ -1,5 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
-import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { lockApp } from "./PasswordGate";
 
 const navItems = [
@@ -82,22 +82,45 @@ const navItems = [
   },
 ];
 
-// Mobile bottom nav items (5 max with center button)
+// Items hidden from mobile bottom bar — shown in "More" menu
+const moreItems = [
+  navItems.find(n => n.to === "/costs"),    // Expenses
+  navItems.find(n => n.to === "/Assets"),   // Assets
+  navItems.find(n => n.to === "/utang"),    // Utang
+];
+
+// Bottom bar: Dashboard, Inventory, Checkout (center), Sales, More
 const mobileNavItems = [
-  navItems[0], // Dashboard
-  navItems[2], // Inventory
-  { ...navItems[1], isCenter: true }, // Checkout
-  navItems[3], // Sales
-  navItems[4], // Expenses
+  navItems[0],                              // Dashboard
+  navItems[2],                              // Inventory
+  { ...navItems[1], isCenter: true },       // Checkout — center FAB
+  navItems[3],                              // Sales
+  { to: "__more__", label: "More", isMore: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+        <circle cx="5"  cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+    ),
+  },
 ];
 
 function Navbar({ onChangePassword }) {
-  const location = useLocation();
+  const location   = useLocation();
+  const navigate   = useNavigate();
+  const [moreOpen, setMoreOpen] = useState(false);
+
   const isActive = (to) => to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
 
-  const handleLock = () => {
-    lockApp();
-    window.location.reload();
+  // "More" dot is active if current page is one of the hidden items
+  const moreIsActive = moreItems.some(i => isActive(i.to));
+
+  const handleLock = () => { lockApp(); window.location.reload(); };
+
+  const handleMoreNav = (to) => {
+    setMoreOpen(false);
+    navigate(to);
   };
 
   return (
@@ -111,15 +134,11 @@ function Navbar({ onChangePassword }) {
 
         @media (min-width: 768px) {
           .sidebar {
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0; left: 0; bottom: 0;
-            width: 220px;
-            background: #ffffff;
+            display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: 220px; background: #ffffff;
             border-right: 1px solid #f0f0f0;
-            z-index: 1000;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+            z-index: 1000; box-shadow: 2px 0 8px rgba(0,0,0,0.04);
           }
           .sidebar-spacer { display: block; width: 220px; flex-shrink: 0; }
           .mobile-nav    { display: none !important; }
@@ -128,17 +147,11 @@ function Navbar({ onChangePassword }) {
 
         /* Sidebar header */
         .sidebar-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 20px 20px 16px;
-          border-bottom: 1px solid #f3f4f6;
-          margin-bottom: 8px;
+          display: flex; align-items: center; gap: 10px;
+          padding: 20px 20px 16px; border-bottom: 1px solid #f3f4f6; margin-bottom: 8px;
         }
         .sidebar-logo {
-          width: 38px; height: 38px;
-          background: #f97316;
-          border-radius: 10px;
+          width: 38px; height: 38px; background: #f97316; border-radius: 10px;
           display: flex; align-items: center; justify-content: center;
           color: white; font-size: 18px; font-weight: 700; flex-shrink: 0;
         }
@@ -148,28 +161,22 @@ function Navbar({ onChangePassword }) {
         /* Nav links */
         .sidebar-link {
           display: flex; align-items: center; gap: 12px;
-          padding: 10px 16px; margin: 2px 10px;
-          border-radius: 10px; text-decoration: none;
-          font-size: 14px; font-weight: 500; color: #6b7280;
+          padding: 10px 16px; margin: 2px 10px; border-radius: 10px;
+          text-decoration: none; font-size: 14px; font-weight: 500; color: #6b7280;
           transition: background 0.15s, color 0.15s; cursor: pointer;
           border: none; width: calc(100% - 20px); background: none;
           font-family: 'DM Sans', sans-serif; text-align: left;
         }
-        .sidebar-link:hover { background: #fff7ed; color: #f97316; }
+        .sidebar-link:hover  { background: #fff7ed; color: #f97316; }
         .sidebar-link.active { background: #fff7ed; color: #f97316; font-weight: 600; }
         .sidebar-link.highlight { background: #f97316; color: #fff; margin-top: 4px; margin-bottom: 4px; }
-        .sidebar-link.highlight:hover { background: #ea6c00; color: #fff; }
+        .sidebar-link.highlight:hover  { background: #ea6c00; color: #fff; }
         .sidebar-link.highlight.active { background: #ea6c00; color: #fff; }
         .sidebar-link.danger:hover { background: #fff5f5; color: #ef4444; }
         .sidebar-icon { display: flex; align-items: center; justify-content: center; width: 22px; flex-shrink: 0; }
 
         /* Bottom section */
-        .sidebar-bottom {
-          margin-top: auto;
-          border-top: 1px solid #f3f4f6;
-          padding-top: 8px;
-          padding-bottom: 16px;
-        }
+        .sidebar-bottom { margin-top: auto; border-top: 1px solid #f3f4f6; padding-top: 8px; padding-bottom: 16px; }
         .sidebar-section-label {
           font-size: 10px; font-weight: 600; text-transform: uppercase;
           letter-spacing: 0.08em; color: #d1d5db; padding: 8px 26px 4px;
@@ -178,8 +185,7 @@ function Navbar({ onChangePassword }) {
         /* ── MOBILE BOTTOM NAV ── */
         .mobile-nav {
           position: fixed; bottom: 0; left: 0; right: 0;
-          height: 70px; background: #fff;
-          border-top: 1px solid #e5e7eb;
+          height: 70px; background: #fff; border-top: 1px solid #e5e7eb;
           justify-content: space-around; align-items: center;
           z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
           padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -188,6 +194,7 @@ function Navbar({ onChangePassword }) {
           display: flex; flex-direction: column; align-items: center;
           justify-content: center; text-decoration: none;
           gap: 3px; flex: 1; height: 100%; color: #9ca3af; transition: color 0.15s;
+          background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif;
         }
         .mobile-nav-item.active { color: #f97316; }
         .mobile-nav-label { font-size: 11px; letter-spacing: 0.01em; }
@@ -203,6 +210,35 @@ function Navbar({ onChangePassword }) {
           box-shadow: 0 4px 14px rgba(249,115,22,0.45);
         }
         .mobile-center-btn.active { background: #ea6c00; }
+
+        /* ── MORE MENU ── */
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .more-backdrop {
+          position: fixed; inset: 0; z-index: 1050;
+          background: rgba(0,0,0,0.35);
+        }
+        .more-menu {
+          position: fixed; bottom: 78px; right: 12px;
+          background: #fff; border-radius: 16px;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+          z-index: 1060; min-width: 190px;
+          padding: 8px; animation: slideUp 0.2s ease;
+        }
+        .more-menu-item {
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 14px; border-radius: 10px; border: none;
+          background: none; width: 100%; text-align: left;
+          font-size: 14px; font-weight: 500; color: #374151;
+          cursor: pointer; font-family: 'DM Sans', sans-serif;
+          transition: background 0.15s;
+        }
+        .more-menu-item:hover  { background: #fff7ed; color: #f97316; }
+        .more-menu-item.active { background: #fff7ed; color: #f97316; font-weight: 700; }
+        .more-menu-icon { width: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .more-menu-divider { height: 1px; background: #f3f4f6; margin: 4px 0; }
       `}</style>
 
       {/* ── DESKTOP SIDEBAR ── */}
@@ -217,18 +253,14 @@ function Navbar({ onChangePassword }) {
 
         <nav style={{ flex: 1, overflowY: "auto" }}>
           {navItems.map(item => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`sidebar-link${item.isHighlight ? " highlight" : ""}${isActive(item.to) ? " active" : ""}`}
-            >
+            <Link key={item.to} to={item.to}
+              className={`sidebar-link${item.isHighlight ? " highlight" : ""}${isActive(item.to) ? " active" : ""}`}>
               <span className="sidebar-icon">{item.icon}</span>
               {item.label}
             </Link>
           ))}
         </nav>
 
-        {/* Bottom: Analytics + Settings */}
         <div className="sidebar-bottom">
           <div className="sidebar-section-label">Analytics</div>
           <Link to="/reports" className={`sidebar-link${isActive("/reports") ? " active" : ""}`}>
@@ -236,15 +268,13 @@ function Navbar({ onChangePassword }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
                 <line x1="18" y1="20" x2="18" y2="10" />
                 <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
+                <line x1="6"  y1="20" x2="6"  y2="14" />
               </svg>
             </span>
             Reports &amp; Analytics
           </Link>
 
           <div className="sidebar-section-label">Security</div>
-
-          {/* Change Password */}
           <button className="sidebar-link" onClick={onChangePassword}>
             <span className="sidebar-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -254,8 +284,6 @@ function Navbar({ onChangePassword }) {
             </span>
             Change Password
           </button>
-
-          {/* Lock App */}
           <button className="sidebar-link danger" onClick={handleLock}>
             <span className="sidebar-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -274,17 +302,54 @@ function Navbar({ onChangePassword }) {
 
       {/* ── MOBILE BOTTOM NAV ── */}
       <div className="mobile-spacer" style={{ height: "70px" }} />
+
+      {/* More menu backdrop + popup */}
+      {moreOpen && (
+        <>
+          <div className="more-backdrop" onClick={() => setMoreOpen(false)} />
+          <div className="more-menu">
+            {moreItems.map((item, i) => (
+              <React.Fragment key={item.to}>
+                {i > 0 && <div className="more-menu-divider" />}
+                <button
+                  className={`more-menu-item${isActive(item.to) ? " active" : ""}`}
+                  onClick={() => handleMoreNav(item.to)}
+                >
+                  <span className="more-menu-icon">{item.icon}</span>
+                  {item.label}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        </>
+      )}
+
       <nav className="mobile-nav">
         {mobileNavItems.map(item => {
           const active = isActive(item.to);
+
           if (item.isCenter) {
             return (
               <Link key={item.to} to={item.to} className="mobile-center-wrapper">
                 <div className={`mobile-center-btn${active ? " active" : ""}`}>{item.icon}</div>
-                <span className="mobile-nav-label" style={{ color: active ? "#f97316" : "#9ca3af", fontWeight: active ? 600 : 400 }}>{item.label}</span>
+                <span className="mobile-nav-label" style={{ color: active ? "#f97316" : "#9ca3af", fontWeight: active ? 600 : 400 }}>
+                  {item.label}
+                </span>
               </Link>
             );
           }
+
+          if (item.isMore) {
+            const moreActive = moreIsActive || moreOpen;
+            return (
+              <button key="more" className={`mobile-nav-item${moreActive ? " active" : ""}`}
+                onClick={() => setMoreOpen(o => !o)}>
+                {item.icon}
+                <span className="mobile-nav-label" style={{ fontWeight: moreActive ? 600 : 400 }}>More</span>
+              </button>
+            );
+          }
+
           return (
             <Link key={item.to} to={item.to} className={`mobile-nav-item${active ? " active" : ""}`}>
               {item.icon}

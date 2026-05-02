@@ -7,6 +7,7 @@ import Utang from "./pages/Utang";
 import Checkout from "./pages/CheckOut";
 import Suppliers from "./pages/Suppliers";
 import Navbar from "./layout/Navbar";
+import Reports from "./pages/Reports";
 import Assets from "./pages/Assets";
 import Notes from "./pages/Notes";
 import PasswordGate from "./layout/PasswordGate";
@@ -72,6 +73,7 @@ function App() {
               <Route path="/Assets"    element={<Assets />} />
               <Route path="/checkout"  element={<Checkout />} />
               <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/reports"  element={<Reports />} />
             </Routes>
           </div>
         </div>
